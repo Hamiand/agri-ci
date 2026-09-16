@@ -13,14 +13,14 @@ def test_two_sessions_cannot_both_reserve_koffis_same_400kg():
     Session=sessionmaker(bind=engine,expire_on_commit=False)
     suffix=uuid.uuid4().hex[:8]
     with Session.begin() as db:
-        user=User(email=f"koffi-{suffix}@test.local",password_hash="test",full_name="Koffi Test",status="ACTIVE")
+        user=User(phone=f"+22507{suffix[:8]}",password_hash="test",preferred_language="fr",status="ACTIVE")
         db.add(user);db.flush()
-        farmer=Farmer(user_id=user.id,farmer_ref=f"FAR-{suffix}",display_name="Koffi",status="VERIFIED")
+        farmer=Farmer(user_id=user.id,farmer_ref=f"FAR-{suffix}",display_name="Koffi Test",status="VERIFIED")
         db.add(farmer);db.flush()
-        farm=Farm(farmer_id=farmer.id,farm_ref=f"FRM-{suffix}",name="Koffi Farm",village="Village Test")
+        farm=Farm(farmer_id=farmer.id,name="Koffi Farm",locality="Village Test")
         db.add(farm);db.flush()
         plot=Plot(farm_id=farm.id,plot_ref=f"PLT-{suffix}",name="Tomato Plot",area_ha=Decimal("1"))
-        product=Product(code=f"T{suffix[:5]}",name_fr="Tomate Test",active=True)
+        product=Product(code=f"T{suffix[:5]}",name_fr="Tomate Test",name_en="Test Tomato",active=True)
         db.add_all([plot,product]);db.flush()
         harvest=Harvest(harvest_ref=f"HAR-{suffix}",farmer_id=farmer.id,plot_id=plot.id,product_id=product.id,
             estimated_quantity_kg=Decimal("500"),expected_start_date=date(2027,5,16),
