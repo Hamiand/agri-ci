@@ -1,0 +1,5 @@
+import Link from "next/link";
+export default function Operations(){return <main className="phoneShell"><header className="farmerHeader"><div><span className="mini">AGRI-CI OPÉRATIONS</span><h1>Centre opérationnel</h1><p>Du point de collecte jusqu’à la livraison.</p></div><div className="avatar">O</div></header>
+<section className="menu"><Link className="farmerAction" href="/operations/quality"><span className="icon">A</span><span><b>QUALITÉ & LOTS</b><small>Classer A/B/C et constituer les lots</small></span><strong>›</strong></Link>
+<Link className="farmerAction" href="/operations/logistics"><span className="icon">▣</span><span><b>TRANSPORT</b><small>Créer et expédier les transports</small></span><strong>›</strong></Link>
+<Link className="farmerAction" href="/operations/delivery"><span className="icon">✓</span><span><b>LIVRAISON</b><small>Confirmer la réception physique</small></span><strong>›</strong></Link><Link className="farmerAction" href="/operations/payments"><span className="icon">₣</span><span><b>RÈGLEMENTS</b><small>Calculer le net dû aux producteurs</small></span><strong>›</strong></Link></section></main>}

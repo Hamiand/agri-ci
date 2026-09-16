@@ -1,0 +1,84 @@
+{
+  "scenario": "AGRI-CI-001",
+  "product": "Tomato",
+  "destination": "Abidjan",
+  "delivery_window": [
+    "2027-05-16",
+    "2027-05-18"
+  ],
+  "target_quantity_kg": 3000,
+  "target_price_xof_per_kg": 760,
+  "accepted_quality": [
+    "A",
+    "B"
+  ],
+  "offers": [
+    {
+      "actor": "Koffi",
+      "kg": 400
+    },
+    {
+      "actor": "Awa",
+      "kg": 750
+    },
+    {
+      "actor": "Mariam",
+      "kg": 600
+    },
+    {
+      "actor": "Yao",
+      "kg": 300
+    },
+    {
+      "actor": "Cooperative A",
+      "kg": 1400
+    }
+  ],
+  "initial_allocation": [
+    {
+      "actor": "Koffi",
+      "kg": 400
+    },
+    {
+      "actor": "Awa",
+      "kg": 750
+    },
+    {
+      "actor": "Mariam",
+      "kg": 600
+    },
+    {
+      "actor": "Yao",
+      "kg": 300
+    },
+    {
+      "actor": "Cooperative A",
+      "kg": 950
+    }
+  ],
+  "decline": {
+    "actor": "Yao",
+    "kg": 300
+  },
+  "replacement": {
+    "actor": "Cooperative A",
+    "kg": 300
+  },
+  "expected_confirmed_kg": 3000,
+  "physical_reference": {
+    "announced_kg": 350,
+    "received_kg": 327,
+    "grades": {
+      "A": 220,
+      "B": 91,
+      "C": 16
+    }
+  },
+  "payment_reference": {
+    "gross_xof": 150000,
+    "transport_xof": 7000,
+    "service_xof": 4500,
+    "other_xof": 1500,
+    "net_xof": 137000
+  }
+}

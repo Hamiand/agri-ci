@@ -1,0 +1,18 @@
+{
+  "release": "v0.28",
+  "target": "AGRI-CI 1.0 Commercial Pilot RC1",
+  "locally_proven": {
+    "python_compile": true,
+    "commercial_structure_gate": true,
+    "shell_script_syntax": true
+  },
+  "requires_external_execution": {
+    "postgresql_alembic": true,
+    "postgresql_concurrency": true,
+    "postgresql_idempotency_replay": true,
+    "full_authenticated_http_e2e": true,
+    "payment_provider_certification": true,
+    "backup_restore_drill": true,
+    "tls_dns_monitoring": true
+  }
+}

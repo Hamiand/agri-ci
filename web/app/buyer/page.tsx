@@ -1,0 +1,6 @@
+import Link from "next/link";
+export default function Buyer(){return <main className="phoneShell"><header className="farmerHeader"><div><span className="mini">AGRI-CI MARCHÉ</span><h1>Bonjour Acheteur</h1><p>Transformez votre besoin en demande agricole structurée.</p></div><div className="avatar">A</div></header>
+<section className="statusCard"><div><span>AGRI-CI agrège pour vous</span><b>Plusieurs producteurs → une commande</b><small>Demande, matching, confirmation, livraison</small></div></section>
+<section className="menu"><Link className="farmerAction" href="/buyer/demand"><span className="icon">＋</span><span><b>PUBLIER UNE DEMANDE</b><small>Produit, quantité, date, prix cible</small></span><strong>›</strong></Link>
+<Link className="farmerAction" href="/buyer/demands"><span className="icon">◎</span><span><b>MES DEMANDES</b><small>Suivre matching et agrégation</small></span><strong>›</strong></Link>
+<Link className="farmerAction" href="/buyer/orders"><span className="icon">▣</span><span><b>MES COMMANDES</b><small>Livraison et réception</small></span><strong>›</strong></Link></section></main>}

@@ -1,0 +1,7 @@
+"use client";
+import {useEffect,useState} from "react";import WorkflowHeader from "@/components/WorkflowHeader";import {api} from "@/lib/api";
+type P={id:string;payment_ref:string;gross_amount_xof:number;deductions_xof:number;net_amount_xof:number;provider:string;status:string};
+export default function Money(){const [rows,setRows]=useState<P[]>([]);const [msg,setMsg]=useState("");useEffect(()=>{api("/payments/farmer/me").then(setRows).catch(e=>setMsg(e.message));},[]);
+ return <main className="workflow"><WorkflowHeader title="Mon argent" subtitle="Montants bruts, coûts autorisés, net producteur et statut du prestataire de paiement." />{msg&&<div className="empty">{msg}</div>}
+ {rows.length?rows.map(p=><section key={p.id}><div className="moneyHero"><span>{p.payment_ref} • {p.status}</span><b>{p.net_amount_xof.toLocaleString("fr-FR")} XOF</b><small>Brut {p.gross_amount_xof.toLocaleString("fr-FR")} XOF • Déductions {p.deductions_xof.toLocaleString("fr-FR")} XOF</small></div><p className="notice">Prestataire : {p.provider}. AGRI-CI trace le règlement sans détenir les fonds.</p></section>):
+ <><section className="moneyHero"><span>EXEMPLE AGRI-CI-001</span><b>137 000 XOF</b><small>Brut 150 000 • Transport 7 000 • AGRI-CI 4 500 • Autre 1 500</small></section><p className="notice">Aucun paiement réel enregistré pour le moment.</p></>}</main>}

@@ -1,0 +1,164 @@
+{
+  "routes": [
+    {
+      "file": "demands/router.py",
+      "method": "GET",
+      "path": "/mine"
+    },
+    {
+      "file": "orders/router.py",
+      "method": "POST",
+      "path": "/from-aggregation/{aggregation_id}"
+    },
+    {
+      "file": "orders/router.py",
+      "method": "GET",
+      "path": "/{order_id}"
+    },
+    {
+      "file": "orders/router.py",
+      "method": "GET",
+      "path": "/{order_id}/operations"
+    },
+    {
+      "file": "payments/router.py",
+      "method": "POST",
+      "path": "/orders/{order_id}/prepare"
+    },
+    {
+      "file": "payments/router.py",
+      "method": "GET",
+      "path": "/farmer/me"
+    },
+    {
+      "file": "payments/router.py",
+      "method": "POST",
+      "path": "/{payment_id}/provider-success"
+    },
+    {
+      "file": "payments/router.py",
+      "method": "GET",
+      "path": "/{payment_id}/ledger"
+    },
+    {
+      "file": "auth/router.py",
+      "method": "POST",
+      "path": "/register"
+    },
+    {
+      "file": "auth/router.py",
+      "method": "POST",
+      "path": "/login"
+    },
+    {
+      "file": "auth/router.py",
+      "method": "POST",
+      "path": "/refresh"
+    },
+    {
+      "file": "matching/router.py",
+      "method": "POST",
+      "path": "/{demand_id}/match"
+    },
+    {
+      "file": "collection/router.py",
+      "method": "POST",
+      "path": "/{collection_id}/quality"
+    },
+    {
+      "file": "collection/router.py",
+      "method": "GET",
+      "path": "/my-allocations"
+    },
+    {
+      "file": "collection/router.py",
+      "method": "GET",
+      "path": "/operations"
+    },
+    {
+      "file": "commitments/router.py",
+      "method": "POST",
+      "path": "/{commitment_id}/accept"
+    },
+    {
+      "file": "commitments/router.py",
+      "method": "POST",
+      "path": "/{commitment_id}/decline"
+    },
+    {
+      "file": "aggregation/router.py",
+      "method": "POST",
+      "path": "/demands/{demand_id}/aggregate"
+    },
+    {
+      "file": "aggregation/router.py",
+      "method": "GET",
+      "path": "/aggregations/{aggregation_id}"
+    },
+    {
+      "file": "logistics/router.py",
+      "method": "POST",
+      "path": "/lots"
+    },
+    {
+      "file": "logistics/router.py",
+      "method": "POST",
+      "path": "/transport-jobs"
+    },
+    {
+      "file": "logistics/router.py",
+      "method": "POST",
+      "path": "/transport-jobs/{job_id}/depart"
+    },
+    {
+      "file": "logistics/router.py",
+      "method": "GET",
+      "path": "/lots"
+    },
+    {
+      "file": "logistics/router.py",
+      "method": "GET",
+      "path": "/transport-jobs"
+    }
+  ],
+  "schemas": [
+    {
+      "file": "auth/schemas.py",
+      "name": "RegisterRequest",
+      "fields": [
+        "phone",
+        "password",
+        "preferred_language",
+        "role"
+      ]
+    },
+    {
+      "file": "auth/schemas.py",
+      "name": "LoginRequest",
+      "fields": [
+        "phone",
+        "password"
+      ]
+    },
+    {
+      "file": "auth/schemas.py",
+      "name": "UserResponse",
+      "fields": [
+        "id",
+        "phone",
+        "preferred_language",
+        "status",
+        "roles"
+      ]
+    },
+    {
+      "file": "auth/schemas.py",
+      "name": "TokenResponse",
+      "fields": [
+        "access_token",
+        "token_type",
+        "user"
+      ]
+    }
+  ]
+}

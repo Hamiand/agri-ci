@@ -1,0 +1,154 @@
+{
+  "scenario": "AGRI-CI-001",
+  "target_kg": 3000,
+  "steps": [
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/auth/register"
+    },
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/farmers"
+    },
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/farms"
+    },
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/plots"
+    },
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/harvests"
+    },
+    {
+      "actor": "farmer_koffi",
+      "method": "POST",
+      "path": "/offers",
+      "quantity_kg": 400
+    },
+    {
+      "actor": "farmer_awa",
+      "method": "POST",
+      "path": "/offers",
+      "quantity_kg": 750
+    },
+    {
+      "actor": "farmer_mariam",
+      "method": "POST",
+      "path": "/offers",
+      "quantity_kg": 600
+    },
+    {
+      "actor": "farmer_yao",
+      "method": "POST",
+      "path": "/offers",
+      "quantity_kg": 300
+    },
+    {
+      "actor": "coop_a",
+      "method": "POST",
+      "path": "/offers",
+      "quantity_kg": 1400
+    },
+    {
+      "actor": "buyer",
+      "method": "POST",
+      "path": "/buyers"
+    },
+    {
+      "actor": "buyer",
+      "method": "POST",
+      "path": "/demands",
+      "quantity_kg": 3000
+    },
+    {
+      "actor": "buyer",
+      "method": "POST",
+      "path": "/demands/{demand_id}/match"
+    },
+    {
+      "actor": "buyer",
+      "method": "POST",
+      "path": "/demands/{demand_id}/aggregate"
+    },
+    {
+      "actor": "farmers",
+      "method": "POST",
+      "path": "/commitments/{id}/accept"
+    },
+    {
+      "actor": "yao",
+      "method": "POST",
+      "path": "/commitments/{id}/decline",
+      "quantity_kg": 300
+    },
+    {
+      "actor": "coop_a",
+      "method": "POST",
+      "path": "/commitments/{replacement_id}/accept",
+      "quantity_kg": 300
+    },
+    {
+      "actor": "buyer",
+      "method": "POST",
+      "path": "/orders/from-aggregation/{aggregation_id}"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/collection"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/collection/{id}/quality"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/lots"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/transport-jobs"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/transport-jobs/{id}/depart"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/deliveries"
+    },
+    {
+      "actor": "operations",
+      "method": "POST",
+      "path": "/payments/orders/{order_id}/prepare"
+    },
+    {
+      "actor": "provider",
+      "method": "POST",
+      "path": "/payment-webhooks/provider"
+    }
+  ],
+  "critical_invariants": [
+    "initial proposed quantity = 3000 kg",
+    "after Yao decline accepted/reserved = 2700 kg",
+    "CoopA still has at least 450 kg available before replacement",
+    "replacement commitment = 300 kg",
+    "firm order created only at 3000 kg confirmed",
+    "Koffi collection example 350 announced -> 327 received",
+    "quality 220 A + 91 B + 16 C = 327 kg",
+    "payment success must come from signed webhook in production"
+  ]
+}
