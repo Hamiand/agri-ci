@@ -1,5 +1,6 @@
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.auth.schemas import RegisterRequest, LoginRequest, TokenResponse, UserResponse
@@ -38,7 +39,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="INVALID_CREDENTIALS")
     roles = roles_for(db, user.id)
-    token = create_access_token, create_refresh_token(str(user.id), roles)
+    token = create_access_token(str(user.id), roles)
     return TokenResponse(access_token=token,
         user=UserResponse(id=user.id, phone=user.phone, preferred_language=user.preferred_language,
                           status=user.status, roles=roles))
@@ -60,7 +61,7 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
     user = db.get(User, uuid.UUID(decoded["sub"]))
     if not user or user.status != "ACTIVE":
         raise HTTPException(status_code=401, detail="USER_NOT_ACTIVE")
-    roles = list(db.scalars(select(Role.name).join(UserRole, UserRole.role_id == Role.id).where(UserRole.user_id == user.id)).all())
+    roles = roles_for(db, user.id)
     return {"access_token": create_access_token(str(user.id), roles),
             "refresh_token": create_refresh_token(str(user.id), roles),
             "token_type": "bearer"}
