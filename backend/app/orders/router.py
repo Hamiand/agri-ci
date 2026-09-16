@@ -10,6 +10,11 @@ from app.orders.service import create_order_from_aggregation
 
 router=APIRouter(prefix="/orders",tags=["Orders"])
 
+
+def _allocation_body(a:OrderAllocation):
+    return {"id":str(a.id),"farmer_id":str(a.farmer_id),"offer_id":str(a.offer_id),
+            "quantity_kg":float(a.quantity_kg),"status":a.status}
+
 @router.post("/from-aggregation/{aggregation_id}",status_code=201)
 def create_order(aggregation_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(get_current_user),
                  idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
@@ -24,9 +29,7 @@ def create_order(aggregation_id:uuid.UUID,db:Session=Depends(get_db),user:User=D
     order=create_order_from_aggregation(db,aggregation_id)
     allocations=db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all()
     body={"order_id":str(order.id),"order_ref":order.order_ref,"status":order.status,
-          "quantity_kg":float(order.quantity_kg),
-          "allocations":[{"farmer_id":str(a.farmer_id),"offer_id":str(a.offer_id),
-                          "quantity_kg":float(a.quantity_kg)} for a in allocations]}
+          "quantity_kg":float(order.quantity_kg),"allocations":[_allocation_body(a) for a in allocations]}
     return complete_idempotent(db,idem,201,body)
 
 @router.get("/{order_id}")
@@ -37,8 +40,7 @@ def get_order(order_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(ge
     if not buyer or order.buyer_id!=buyer.id:raise HTTPException(status_code=403,detail="ORDER_NOT_OWNED")
     allocations=db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all()
     return {"order_id":str(order.id),"order_ref":order.order_ref,"status":order.status,
-            "quantity_kg":float(order.quantity_kg),
-            "allocations":[{"farmer_id":str(a.farmer_id),"quantity_kg":float(a.quantity_kg)} for a in allocations]}
+            "quantity_kg":float(order.quantity_kg),"allocations":[_allocation_body(a) for a in allocations]}
 
 @router.get("")
 def my_orders(db:Session=Depends(get_db),user:User=Depends(get_current_user)):
