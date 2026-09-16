@@ -46,6 +46,7 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     suffix = uuid.uuid4().hex[:8]
     password = "Pilot-Test-Password-123!"
     buyer_phone = f"+225010{suffix}"
+    ops_phone = f"+225099{suffix}"
     farmer_specs = [
         ("Koffi", "400"), ("Awa", "750"), ("Mariam", "600"),
         ("Yao", "300"), ("Cooperative A", "1400"),
@@ -57,6 +58,9 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
         "display_name": "Acheteur Abidjan", "buyer_type": "WHOLESALER", "city": "Abidjan",
     })
     assert buyer_response.status_code == 201, buyer_response.text
+
+    _register(client, ops_phone, password, "OPERATIONS_MANAGER")
+    ops_headers = _auth(client, ops_phone, password)
 
     engine = create_engine(os.environ["TEST_DATABASE_URL"], pool_pre_ping=True)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -164,6 +168,7 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
         headers={**buyer_headers, "Idempotency-Key": f"order-final-{suffix}"})
     assert order_response.status_code == 201, order_response.text
     order = order_response.json()
+    order_id = order["order_id"]
     assert order["status"] == "CONFIRMED"
     assert order["quantity_kg"] == 3000.0
     assert sum(item["quantity_kg"] for item in order["allocations"]) == 3000.0
@@ -171,4 +176,82 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     replay = client.post(f"/orders/from-aggregation/{aggregation_id}",
         headers={**buyer_headers, "Idempotency-Key": f"order-final-{suffix}"})
     assert replay.status_code == 201, replay.text
-    assert replay.json()["order_id"] == order["order_id"]
+    assert replay.json()["order_id"] == order_id
+
+    # Physical execution: every confirmed allocation is collected and quality-checked.
+    quality_check_ids = []
+    for allocation in order["allocations"]:
+        quantity = allocation["quantity_kg"]
+        collected = client.post("/collection", headers={
+            **ops_headers, "Idempotency-Key": f"collect-{allocation['id']}",
+        }, json={
+            "order_allocation_id": allocation["id"], "received_quantity_kg": quantity,
+            "location_name": "Centre de collecte AGRI-CI-001",
+        })
+        assert collected.status_code == 201, collected.text
+        assert collected.json()["received_quantity_kg"] == quantity
+        collection_id = collected.json()["collection_id"]
+
+        quality = client.post(f"/collection/{collection_id}/quality", headers={
+            **ops_headers, "Idempotency-Key": f"quality-{collection_id}",
+        }, json={"grade": "A", "quantity_kg": quantity, "notes": "AGRI-CI-001 acceptance"})
+        assert quality.status_code == 201, quality.text
+        assert quality.json()["quantity_kg"] == quantity
+        quality_check_ids.append(quality.json()["quality_check_id"])
+
+    # Aggregated grade-A lot, transport departure and complete delivery to Abidjan.
+    lot_response = client.post("/lots", headers={
+        **ops_headers, "Idempotency-Key": f"lot-{suffix}",
+    }, json={"order_id": order_id, "quality_check_ids": quality_check_ids})
+    assert lot_response.status_code == 201, lot_response.text
+    lot = lot_response.json()
+    assert lot["grade"] == "A"
+    assert lot["quantity_kg"] == 3000.0
+
+    transport_response = client.post("/transport-jobs", headers={
+        **ops_headers, "Idempotency-Key": f"transport-{suffix}",
+    }, json={
+        "order_id": order_id, "lot_ids": [lot["lot_id"]],
+        "origin": "Centre de collecte AGRI-CI-001", "destination": "Abidjan",
+        "vehicle_ref": "AGRI-CI-TRUCK-001", "driver_name": "Pilote AGRI-CI",
+    })
+    assert transport_response.status_code == 201, transport_response.text
+    transport_id = transport_response.json()["transport_job_id"]
+    assert transport_response.json()["status"] == "PLANNED"
+
+    departed = client.post(f"/transport-jobs/{transport_id}/depart", headers={
+        **ops_headers, "Idempotency-Key": f"depart-{suffix}",
+    })
+    assert departed.status_code == 200, departed.text
+    assert departed.json()["status"] == "IN_TRANSIT"
+
+    delivered = client.post("/deliveries", headers={
+        **ops_headers, "Idempotency-Key": f"delivery-{suffix}",
+    }, json={
+        "transport_job_id": transport_id, "delivered_quantity_kg": 3000,
+        "received_by": "Acheteur Abidjan",
+    })
+    assert delivered.status_code == 201, delivered.text
+    assert delivered.json()["delivered_quantity_kg"] == 3000.0
+    assert delivered.json()["transport_status"] == "DELIVERED"
+
+    # Settlement preparation proves the commercial hand-off after physical delivery.
+    settlement = client.post(f"/payments/orders/{order_id}/prepare", headers={
+        **ops_headers, "Idempotency-Key": f"settlement-{suffix}",
+    }, json={
+        "price_xof_per_kg": 760, "transport_xof": 70000,
+        "service_xof": 45000, "other_xof": 15000, "provider": "PILOT_PROVIDER",
+    })
+    assert settlement.status_code == 200, settlement.text
+    prepared = settlement.json()["prepared"]
+    assert len(prepared) == 4
+    assert sum(item["received_quantity_kg"] for item in prepared) == 3000.0
+    assert sum(item["gross_amount_xof"] for item in prepared) == 2280000.0
+    assert all(item["status"] == "PENDING" for item in prepared)
+
+    payments = client.get(f"/payments?order_id={order_id}", headers=ops_headers)
+    assert payments.status_code == 200, payments.text
+    assert len(payments.json()) == 4
+    assert sum(item["gross_amount_xof"] for item in payments.json()) == 2280000.0
+
+    engine.dispose()
