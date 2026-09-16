@@ -79,7 +79,7 @@ def my_allocations(db:Session=Depends(get_db),user:User=Depends(get_current_user
     return out
 
 @router.get("/operations")
-def collection_operations(db:Session=Depends(get_db),user:User=Depends(get_current_user)):
+def collection_operations(db:Session=Depends(get_db),user:User=Depends(require_roles("COLLECTION_AGENT","OPERATIONS_MANAGER","ADMIN"))):
     from app.database.models import Order,Product
     rows=db.execute(select(CollectionEvent,Order,Product)
         .join(Order,CollectionEvent.order_id==Order.id).join(Product,Order.product_id==Product.id)
