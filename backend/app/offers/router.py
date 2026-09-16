@@ -1,10 +1,11 @@
 import uuid
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Header
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
+from app.core.idempotency_service import begin_idempotent, complete_idempotent
 from app.database.models import Farmer, Harvest, Offer, User
 from app.database.session import get_db
 
@@ -29,9 +30,13 @@ class OfferOut(BaseModel):
     model_config = {"from_attributes": True}
 
 @router.post("", response_model=OfferOut, status_code=201)
-def create_offer(payload: OfferCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def create_offer(payload: OfferCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user),
+                 idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")):
+    idem = begin_idempotent(db, user, "/offers", idempotency_key, payload.model_dump(mode="json"))
+    if idem.response_body is not None:
+        return idem.response_body
     farmer = db.scalar(select(Farmer).where(Farmer.user_id == user.id))
-    harvest = db.scalar(select(Harvest).where(Harvest.id == payload.harvest_id))
+    harvest = db.scalar(select(Harvest).where(Harvest.id == payload.harvest_id).with_for_update())
     if not farmer or not harvest or harvest.farmer_id != farmer.id:
         raise HTTPException(status_code=403, detail="HARVEST_NOT_OWNED")
     already_offered = db.scalar(select(func.coalesce(func.sum(Offer.quantity_total_kg), 0)).where(
@@ -44,5 +49,9 @@ def create_offer(payload: OfferCreate, db: Session = Depends(get_db), user: User
         quantity_available_kg=payload.quantity_kg, quantity_proposed_kg=0, quantity_reserved_kg=0,
         quantity_sold_kg=0, asking_price_xof_per_kg=payload.asking_price_xof_per_kg,
         quality_grade=payload.quality_grade, status="ACTIVE")
-    db.add(offer); db.commit(); db.refresh(offer)
-    return offer
+    db.add(offer); db.flush()
+    body = {"id": str(offer.id), "offer_ref": offer.offer_ref,
+        "quantity_total_kg": str(offer.quantity_total_kg), "quantity_available_kg": str(offer.quantity_available_kg),
+        "quantity_proposed_kg": str(offer.quantity_proposed_kg), "quantity_reserved_kg": str(offer.quantity_reserved_kg),
+        "quantity_sold_kg": str(offer.quantity_sold_kg), "status": offer.status, "version": offer.version}
+    return complete_idempotent(db, idem, 201, body)
