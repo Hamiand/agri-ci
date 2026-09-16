@@ -25,7 +25,8 @@ from app.payments.webhook import router as payment_webhook_router
 from app.core.config import get_settings
 from app.core.exceptions import http_exception_handler
 from app.core.middleware import RequestIdMiddleware
-from app.core.production import production_checks
+from app.core.production_middleware import ProductionHeadersMiddleware
+from app.core.production_readiness import production_checks
 from app.database.session import get_db
 
 settings = get_settings()
@@ -36,6 +37,7 @@ app = FastAPI(
 )
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_middleware(RequestIdMiddleware)
+app.add_middleware(ProductionHeadersMiddleware)
 
 # CORS_ORIGINS is supplied by the deployment environment as a comma-separated value.
 CORS_ORIGINS = settings.cors_origin_list
