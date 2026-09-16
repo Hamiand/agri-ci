@@ -7,7 +7,8 @@ from sqlalchemy import func,select
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user,require_roles
 from app.core.idempotency_service import begin_idempotent,complete_idempotent
-from app.database.models import CollectionEvent,Farmer,LedgerEntry,Order,OrderAllocation,PaymentDeduction,PaymentIntent,User
+from app.database.models import (CollectionEvent,Delivery,Farmer,LedgerEntry,Lot,LotSource,Order,
+    OrderAllocation,PaymentDeduction,PaymentIntent,QualityCheck,TransportJobLot,User)
 from app.database.session import get_db
 from app.payments.service import ALLOWED_DEDUCTIONS,add_ledger,compute_net,mark_provider_success
 
@@ -72,6 +73,39 @@ class SettlementPrepare(BaseModel):
     other_xof:Decimal=Field(default=0,ge=0)
     provider:str=Field(min_length=2,max_length=50)
 
+def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
+    """Attribute delivered quantity back to farmers through lot provenance.
+
+    Delivery is currently recorded at transport-job level. For a partial delivery, the delivered
+    fraction of that job is applied proportionally to every source lot in the job. This prevents
+    settlement of merely collected produce while preserving exact farmer provenance for complete
+    deliveries. A future delivery-allocation table can replace the proportional rule without
+    changing the payment API.
+    """
+    capacities=dict(db.execute(select(TransportJobLot.transport_job_id,func.sum(Lot.quantity_kg))
+        .join(Lot,Lot.id==TransportJobLot.lot_id)
+        .where(Lot.order_id==order_id)
+        .group_by(TransportJobLot.transport_job_id)).all())
+    delivered=dict(db.execute(select(Delivery.transport_job_id,func.sum(Delivery.delivered_quantity_kg))
+        .where(Delivery.order_id==order_id,Delivery.status=="DELIVERED")
+        .group_by(Delivery.transport_job_id)).all())
+    sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg)
+        .join(Lot,Lot.id==TransportJobLot.lot_id)
+        .join(LotSource,LotSource.lot_id==Lot.id)
+        .join(QualityCheck,QualityCheck.id==LotSource.quality_check_id)
+        .join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id)
+        .join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id)
+        .where(Lot.order_id==order_id)).all()
+    result:dict[uuid.UUID,Decimal]={}
+    for job_id,farmer_id,source_qty in sources:
+        capacity=Decimal(capacities.get(job_id) or 0)
+        delivered_qty=Decimal(delivered.get(job_id) or 0)
+        if capacity<=0 or delivered_qty<=0:continue
+        fraction=min(Decimal("1"),delivered_qty/capacity)
+        attributable=(Decimal(source_qty)*fraction).quantize(Decimal("0.001"))
+        result[farmer_id]=result.get(farmer_id,Decimal("0"))+attributable
+    return result
+
 @router.post("/orders/{order_id}/prepare")
 def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=Depends(get_db),
                               user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),
@@ -84,20 +118,15 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
     allocations=db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all()
     if not allocations:raise HTTPException(status_code=409,detail="ORDER_HAS_NO_ALLOCATIONS")
 
-    # A farmer can have several allocations in one order (for example after a refill).
-    # Settlement is commercial-account based: aggregate all physically received allocations
-    # for that farmer before creating the single order/farmer PaymentIntent.
-    received_by_farmer:dict[uuid.UUID,Decimal]={}
-    for allocation in allocations:
-        received=Decimal(db.scalar(select(func.coalesce(func.sum(CollectionEvent.received_quantity_kg),0))
-            .where(CollectionEvent.order_allocation_id==allocation.id)) or 0)
-        if received>0:
-            received_by_farmer[allocation.farmer_id]=received_by_farmer.get(allocation.farmer_id,Decimal("0"))+received
-
+    # Commercial settlement is based on delivered produce, not merely collected produce.
+    # Multiple allocations for the same farmer are consolidated into one PaymentIntent.
+    delivered_by_farmer=_delivered_quantity_by_farmer(db,order.id)
     prepared=[]
-    for farmer_id,received in received_by_farmer.items():
-        gross=(received*p.price_xof_per_kg).quantize(Decimal("0.01"))
-        share=received/Decimal(order.quantity_kg)
+    total_delivered=sum(delivered_by_farmer.values(),Decimal("0"))
+    if total_delivered<=0:raise HTTPException(status_code=409,detail="NO_DELIVERED_QUANTITY_TO_SETTLE")
+    for farmer_id,delivered_qty in delivered_by_farmer.items():
+        gross=(delivered_qty*p.price_xof_per_kg).quantize(Decimal("0.01"))
+        share=delivered_qty/total_delivered
         deductions=[
           DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",
                       amount_xof=(p.transport_xof*share).quantize(Decimal("0.01"))),
@@ -108,10 +137,9 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
         pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,
             gross_amount_xof=gross,deductions=deductions,provider=p.provider))
         prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),
-          "received_quantity_kg":float(received),"gross_amount_xof":float(pay.gross_amount_xof),
+          "delivered_quantity_kg":float(delivered_qty),"gross_amount_xof":float(pay.gross_amount_xof),
           "net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
-    if not prepared:raise HTTPException(status_code=409,detail="NO_COLLECTED_QUANTITY_TO_SETTLE")
-    body={"order_id":str(order.id),"prepared":prepared}
+    body={"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY","prepared":prepared}
     return complete_idempotent(db,idem,200,body)
 
 @router.get("/farmer/me")
