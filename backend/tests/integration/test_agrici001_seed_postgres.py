@@ -13,12 +13,12 @@ def test_agrici001_supply_seed_totals_and_coop_reserve():
     suffix=uuid.uuid4().hex[:7]
     quantities=[("Koffi",400),("Awa",750),("Mariam",600),("Yao",300),("Cooperative A",1400)]
     with Session.begin() as db:
-        product=Product(code=f"A{suffix[:5]}",name_fr="Tomate AGRI-CI-001",active=True);db.add(product);db.flush()
+        product=Product(code=f"A{suffix[:5]}",name_fr="Tomate AGRI-CI-001",name_en="AGRI-CI-001 Tomato",active=True);db.add(product);db.flush()
         offer_ids=[]
         for i,(name,qty) in enumerate(quantities):
-            u=User(email=f"{name.replace(' ','').lower()}-{suffix}@test.local",password_hash="test",full_name=name,status="ACTIVE");db.add(u);db.flush()
+            u=User(phone=f"+22507{suffix}{i}",password_hash="test",preferred_language="fr",status="ACTIVE");db.add(u);db.flush()
             f=Farmer(user_id=u.id,farmer_ref=f"F-{suffix}-{i}",display_name=name,status="VERIFIED");db.add(f);db.flush()
-            farm=Farm(farmer_id=f.id,farm_ref=f"FM-{suffix}-{i}",name=f"{name} Farm",village=f"Village {i+1}");db.add(farm);db.flush()
+            farm=Farm(farmer_id=f.id,name=f"{name} Farm",locality=f"Village {i+1}");db.add(farm);db.flush()
             plot=Plot(farm_id=farm.id,plot_ref=f"P-{suffix}-{i}",name="Tomato",area_ha=Decimal("1"));db.add(plot);db.flush()
             h=Harvest(harvest_ref=f"H-{suffix}-{i}",farmer_id=f.id,plot_id=plot.id,product_id=product.id,
                 estimated_quantity_kg=Decimal(str(qty)),expected_start_date=date(2027,5,16),expected_end_date=date(2027,5,18),
