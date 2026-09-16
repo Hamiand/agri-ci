@@ -14,6 +14,8 @@ def get_current_user(authorization: str | None = Header(default=None), db: Sessi
         raise HTTPException(status_code=401, detail="AUTHENTICATION_REQUIRED")
     try:
         payload = jwt.decode(authorization[7:], settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        if payload.get("type") != "access":
+            raise ValueError("access token required")
         user_id = uuid.UUID(payload["sub"])
     except Exception:
         raise HTTPException(status_code=401, detail="INVALID_TOKEN")
