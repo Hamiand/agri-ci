@@ -81,7 +81,10 @@ def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID
     sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg).join(Lot,Lot.id==TransportJobLot.lot_id).join(LotSource,LotSource.lot_id==Lot.id).join(QualityCheck,QualityCheck.id==LotSource.quality_check_id).join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id).join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id).where(Lot.order_id==order_id)).all();return _attribute_delivery_sources(capacities,delivered,sources)
 
 def _already_settled_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
-    rows=db.execute(text("SELECT farmer_id, COALESCE(SUM(settled_quantity_kg),0) FROM payment_intents WHERE order_id=:order_id GROUP BY farmer_id"),{"order_id":order_id}).all()
+    # A prepared/in-flight/successful payment reserves its represented quantity so
+    # retries cannot pay the same kilograms twice. FAILED and REFUNDED payments
+    # deliberately do not reserve quantity: those kilograms must become payable again.
+    rows=db.execute(text("SELECT farmer_id, COALESCE(SUM(settled_quantity_kg),0) FROM payment_intents WHERE order_id=:order_id AND status IN ('PENDING','PROCESSING','SUCCESS','DISPUTED') GROUP BY farmer_id"),{"order_id":order_id}).all()
     return {farmer_id:Decimal(quantity or 0) for farmer_id,quantity in rows}
 
 @router.post("/orders/{order_id}/prepare")
