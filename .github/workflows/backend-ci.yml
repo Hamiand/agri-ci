@@ -27,7 +27,7 @@ jobs:
       PAYMENT_WEBHOOK_SECRET: ci-payment-webhook-secret-change-this
       CORS_ORIGINS: http://localhost:3000
       APP_ENV: staging
-      JWT_SECRET: ci-only-secret-change-me
+      JWT_SECRET: ci-test-secret-for-runtime-validation-only
     defaults:
       run:
         working-directory: backend
