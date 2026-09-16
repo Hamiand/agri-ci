@@ -1,7 +1,7 @@
 import os,uuid,pytest
-from sqlalchemy import create_engine,select
+from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from app.database.models import User,IdempotencyKey
+from app.database.models import User
 from app.core.idempotency_service import begin_idempotent,complete_idempotent
 pytestmark=[pytest.mark.integration,pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"),reason="TEST_DATABASE_URL required")]
 
@@ -10,7 +10,7 @@ def test_completed_response_is_replayed_and_payload_change_rejected():
     Session=sessionmaker(bind=engine,expire_on_commit=False)
     suffix=uuid.uuid4().hex[:10]
     with Session.begin() as db:
-        u=User(email=f"idem-{suffix}@test.local",password_hash="test",full_name="Idem Test",status="ACTIVE")
+        u=User(phone=f"+22505{suffix}",password_hash="test",preferred_language="fr",status="ACTIVE")
         db.add(u);db.flush();uid=u.id
     key=f"idem-{suffix}"; endpoint="/test/quantity"; payload={"quantity_kg":400}
     with Session() as db:
