@@ -86,8 +86,11 @@ def depart(job_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(require
     body={"transport_ref":job.transport_ref,"status":job.status}
     return complete_idempotent(db,idem,200,body)
 
+# Pilot security boundary: until TransportJob carries an explicit transporter/user assignment,
+# global operational listings are restricted to central operations. A TRANSPORTER must not be
+# able to enumerate every lot or every transport job nationally merely because of the role.
 @router.get("/lots")
-def list_lots(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=Depends(require_roles("TRANSPORTER","OPERATIONS_MANAGER","ADMIN"))):
+def list_lots(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN"))):
     q=select(Lot).order_by(Lot.created_at.desc())
     if order_id:q=q.where(Lot.order_id==order_id)
     rows=db.scalars(q).all()
@@ -95,7 +98,7 @@ def list_lots(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=
       "quantity_kg":float(x.quantity_kg),"status":x.status} for x in rows]
 
 @router.get("/transport-jobs")
-def list_transport_jobs(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=Depends(require_roles("TRANSPORTER","OPERATIONS_MANAGER","ADMIN"))):
+def list_transport_jobs(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN"))):
     q=select(TransportJob).order_by(TransportJob.created_at.desc())
     if order_id:q=q.where(TransportJob.order_id==order_id)
     rows=db.scalars(q).all()
