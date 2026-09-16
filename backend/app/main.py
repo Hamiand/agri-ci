@@ -50,8 +50,9 @@ if CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# The canonical AGRI-CI contract currently exposes these routes at the public root.
-# API versioning can be introduced behind a gateway without changing domain services.
+# Canonical AGRI-CI HTTP contract. Keep router registration explicit so FastAPI
+# exposes normal APIRoute objects and route/security contract tests inspect the
+# same endpoints that clients call.
 for router in [
     auth_router,
     farmers_router,
@@ -72,7 +73,7 @@ for router in [
     payments_router,
     payment_webhook_router,
 ]:
-    app.include_router(router)
+    app.router.include_router(router)
 
 
 @app.exception_handler(Exception)
