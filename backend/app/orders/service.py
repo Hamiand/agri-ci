@@ -44,5 +44,8 @@ def create_order_from_aggregation(db:Session,aggregation_id):
     demand.status="CONFIRMED"
     db.add(DomainEvent(event_type="ORDER_CONFIRMED",aggregate_type="ORDER",aggregate_id=str(order.id),
         payload={"order_ref":order.order_ref,"quantity_kg":float(order.quantity_kg)}))
-    db.commit();db.refresh(order)
+    # The HTTP boundary owns the commit. Keeping this service commit-free makes
+    # order creation, allocations, stock checks and the persisted idempotency
+    # response one atomic transaction in /orders/from-aggregation/{id}.
+    db.flush()
     return order
