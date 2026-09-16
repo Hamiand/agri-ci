@@ -44,7 +44,10 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
         farm=client.post("/farms",headers=headers,json={"name":f"Exploitation {name}","locality":f"Village {index+1}"});assert farm.status_code==201,farm.text
         plot=client.post("/plots",headers=headers,json={"farm_id":farm.json()["id"],"plot_ref":f"P-{suffix}-{index}","name":"Tomate","area_ha":"1.0"});assert plot.status_code==201,plot.text
         harvest=client.post("/harvests",headers=headers,json={"plot_id":plot.json()["id"],"product_code":product_code,"expected_start_date":"2027-05-16","expected_end_date":"2027-05-18","estimated_quantity_kg":quantity});assert harvest.status_code==201,harvest.text
-        offer=client.post("/offers",headers=headers,json={"harvest_id":harvest.json()["id"],"quantity_kg":quantity,"asking_price_xof_per_kg":"760","quality_grade":"A"});assert offer.status_code==201,offer.text
+        offer_headers={**headers,"Idempotency-Key":f"offer-{suffix}-{index}"}
+        offer_payload={"harvest_id":harvest.json()["id"],"quantity_kg":quantity,"asking_price_xof_per_kg":"760","quality_grade":"A"}
+        offer=client.post("/offers",headers=offer_headers,json=offer_payload);assert offer.status_code==201,offer.text
+        offer_replay=client.post("/offers",headers=offer_headers,json=offer_payload);assert offer_replay.status_code==201 and offer_replay.json()==offer.json()
         offer_ids[name]=uuid.UUID(offer.json()["id"])
     demand=client.post("/demands",headers=buyer_headers,json={"product_code":product_code,"quantity_required_kg":"3000","delivery_start_date":"2027-05-16","delivery_end_date":"2027-05-18","target_price_xof_per_kg":"760","quality_grades":["A","B"],"destination_city":"Abidjan"});assert demand.status_code==201,demand.text
     demand_id=uuid.UUID(demand.json()["id"]);scores={"Koffi":Decimal("99"),"Awa":Decimal("98"),"Mariam":Decimal("97"),"Yao":Decimal("96"),"Cooperative A":Decimal("95")}
@@ -84,8 +87,6 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     settlement_replay=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement_replay.status_code==200 and settlement_replay.json()==settlement.json()
     payments=client.get(f"/payments?order_id={order_id}",headers=ops_headers);assert payments.status_code==200 and len(payments.json())==4
 
-    # Accounting acceptance gate: each farmer payment must reconcile exactly and the campaign
-    # must preserve the authorized 70k + 45k + 15k deductions without rounding leakage.
     total_gross=Decimal("0");total_deductions=Decimal("0");total_net=Decimal("0")
     deduction_totals={"TRANSPORT":Decimal("0"),"AGRI_CI_SERVICE":Decimal("0"),"OTHER_AUTHORIZED":Decimal("0")}
     for payment in payments.json():
