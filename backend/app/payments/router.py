@@ -73,6 +73,18 @@ class SettlementPrepare(BaseModel):
     other_xof:Decimal=Field(default=0,ge=0)
     provider:str=Field(min_length=2,max_length=50)
 
+def _attribute_delivery_sources(capacities,delivered,sources)->dict[uuid.UUID,Decimal]:
+    """Pure settlement rule: attribute only the delivered fraction of each transport job."""
+    result:dict[uuid.UUID,Decimal]={}
+    for job_id,farmer_id,source_qty in sources:
+        capacity=Decimal(capacities.get(job_id) or 0)
+        delivered_qty=Decimal(delivered.get(job_id) or 0)
+        if capacity<=0 or delivered_qty<=0:continue
+        fraction=min(Decimal("1"),delivered_qty/capacity)
+        attributable=(Decimal(source_qty)*fraction).quantize(Decimal("0.001"))
+        result[farmer_id]=result.get(farmer_id,Decimal("0"))+attributable
+    return result
+
 def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
     """Attribute delivered quantity back to farmers through lot provenance.
 
@@ -96,15 +108,7 @@ def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID
         .join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id)
         .join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id)
         .where(Lot.order_id==order_id)).all()
-    result:dict[uuid.UUID,Decimal]={}
-    for job_id,farmer_id,source_qty in sources:
-        capacity=Decimal(capacities.get(job_id) or 0)
-        delivered_qty=Decimal(delivered.get(job_id) or 0)
-        if capacity<=0 or delivered_qty<=0:continue
-        fraction=min(Decimal("1"),delivered_qty/capacity)
-        attributable=(Decimal(source_qty)*fraction).quantize(Decimal("0.001"))
-        result[farmer_id]=result.get(farmer_id,Decimal("0"))+attributable
-    return result
+    return _attribute_delivery_sources(capacities,delivered,sources)
 
 @router.post("/orders/{order_id}/prepare")
 def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=Depends(get_db),
