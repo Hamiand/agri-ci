@@ -9,8 +9,10 @@ from app.database.session import get_db
 
 router = APIRouter(prefix="/farmers", tags=["Farmers"])
 
+
 class FarmerCreate(BaseModel):
     display_name: str = Field(min_length=2, max_length=150)
+
 
 class FarmerOut(BaseModel):
     id: uuid.UUID
@@ -19,13 +21,44 @@ class FarmerOut(BaseModel):
     status: str
     model_config = {"from_attributes": True}
 
+
+@router.get("/me", response_model=FarmerOut)
+def get_my_farmer_profile(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Return the farmer profile owned by the authenticated user."""
+    farmer = db.scalar(select(Farmer).where(Farmer.user_id == user.id))
+    if not farmer:
+        raise HTTPException(status_code=404, detail="FARMER_PROFILE_NOT_FOUND")
+    return farmer
+
+
 @router.post("", response_model=FarmerOut, status_code=201)
-def create_farmer(payload: FarmerCreate, request: Request, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+def create_farmer(
+    payload: FarmerCreate,
+    request: Request,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
     if db.scalar(select(Farmer).where(Farmer.user_id == user.id)):
         raise HTTPException(status_code=409, detail="FARMER_PROFILE_ALREADY_EXISTS")
-    farmer = Farmer(user_id=user.id, farmer_ref=f"AGR-P-{uuid.uuid4().hex[:8].upper()}", display_name=payload.display_name)
-    db.add(farmer); db.flush()
-    db.add(AuditLog(actor_user_id=user.id, action="FARMER_CREATED", entity_type="FARMER",
-                    entity_id=str(farmer.id), request_id=request.state.request_id))
-    db.commit(); db.refresh(farmer)
+    farmer = Farmer(
+        user_id=user.id,
+        farmer_ref=f"AGR-P-{uuid.uuid4().hex[:8].upper()}",
+        display_name=payload.display_name,
+    )
+    db.add(farmer)
+    db.flush()
+    db.add(
+        AuditLog(
+            actor_user_id=user.id,
+            action="FARMER_CREATED",
+            entity_type="FARMER",
+            entity_id=str(farmer.id),
+            request_id=request.state.request_id,
+        )
+    )
+    db.commit()
+    db.refresh(farmer)
     return farmer
