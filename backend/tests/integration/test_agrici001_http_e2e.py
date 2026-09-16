@@ -77,7 +77,15 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     mine=client.get("/transport-jobs",headers=transporter_headers);assert mine.status_code==200 and [x["id"] for x in mine.json()]==[transport_id]
     departed=client.post(f"/transport-jobs/{transport_id}/depart",headers={**transporter_headers,"Idempotency-Key":f"depart-{suffix}"});assert departed.status_code==200 and departed.json()["status"]=="IN_TRANSIT"
     delivered=client.post("/deliveries",headers={**ops_headers,"Idempotency-Key":f"delivery-{suffix}"},json={"transport_job_id":transport_id,"delivered_quantity_kg":3000,"received_by":"Acheteur Abidjan"});assert delivered.status_code==201,delivered.text
-    settlement=client.post(f"/payments/orders/{order_id}/prepare",headers={**ops_headers,"Idempotency-Key":f"settlement-{suffix}"},json={"price_xof_per_kg":760,"transport_xof":70000,"service_xof":45000,"other_xof":15000,"provider":"PILOT_PROVIDER"});assert settlement.status_code==200,settlement.text
+    settlement_payload={"price_xof_per_kg":760,"transport_xof":70000,"service_xof":45000,"other_xof":15000,"provider":"PILOT_PROVIDER"}
+    settlement_headers={**ops_headers,"Idempotency-Key":f"settlement-{suffix}"}
+    settlement=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement.status_code==200,settlement.text
     assert settlement.json()["settlement_basis"]=="DELIVERED_QUANTITY";prepared=settlement.json()["prepared"];assert len(prepared)==4 and sum(x["delivered_quantity_kg"] for x in prepared)==3000.0 and sum(x["gross_amount_xof"] for x in prepared)==2280000.0
+    settlement_replay=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement_replay.status_code==200 and settlement_replay.json()==settlement.json()
     payments=client.get(f"/payments?order_id={order_id}",headers=ops_headers);assert payments.status_code==200 and len(payments.json())==4
+    first_payment=payments.json()[0]
+    success_headers={**ops_headers,"Idempotency-Key":f"provider-success-{suffix}"};success_payload={"provider_reference":f"PILOT-{suffix}"}
+    success=client.post(f"/payments/{first_payment['id']}/provider-success",headers=success_headers,json=success_payload);assert success.status_code==200,success.text
+    assert success.json()["status"]=="SUCCESS" and success.json()["provider_reference"]==success_payload["provider_reference"]
+    success_replay=client.post(f"/payments/{first_payment['id']}/provider-success",headers=success_headers,json=success_payload);assert success_replay.status_code==200 and success_replay.json()==success.json()
     engine.dispose()
