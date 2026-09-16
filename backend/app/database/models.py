@@ -1,8 +1,8 @@
 import uuid
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database.base import Base
 
@@ -117,9 +117,6 @@ class Offer(Base):
     version: Mapped[int]=mapped_column(Integer,default=1,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
-from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy import Text, UniqueConstraint
-
 class Buyer(Base):
     __tablename__="buyers"
     id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
@@ -129,6 +126,8 @@ class Buyer(Base):
     buyer_type: Mapped[str]=mapped_column(String(30),nullable=False)
     city: Mapped[str|None]=mapped_column(String(100))
     reliability_score: Mapped[Decimal]=mapped_column(Numeric(5,2),default=70,nullable=False)
+    status: Mapped[str]=mapped_column(String(20),default="ACTIVE",nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class Demand(Base):
     __tablename__="demands"
@@ -140,9 +139,10 @@ class Demand(Base):
     delivery_start_date: Mapped[date]=mapped_column(Date,nullable=False)
     delivery_end_date: Mapped[date]=mapped_column(Date,nullable=False)
     target_price_xof_per_kg: Mapped[Decimal|None]=mapped_column(Numeric(14,2))
-    accepted_quality_grades: Mapped[list]=mapped_column(JSONB,default=list,nullable=False)
-    delivery_city: Mapped[str]=mapped_column(String(120),nullable=False)
+    quality_grades: Mapped[list]=mapped_column(JSONB,default=list,nullable=False)
+    destination_city: Mapped[str|None]=mapped_column(String(100))
     status: Mapped[str]=mapped_column(String(30),default="PUBLISHED",nullable=False)
+    version: Mapped[int]=mapped_column(Integer,default=1,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class Match(Base):
@@ -150,19 +150,27 @@ class Match(Base):
     id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     demand_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("demands.id",ondelete="CASCADE"),nullable=False)
     offer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("offers.id",ondelete="CASCADE"),nullable=False)
-    total_score: Mapped[Decimal]=mapped_column(Numeric(6,2),nullable=False)
-    score_components: Mapped[dict]=mapped_column(JSONB,nullable=False)
+    compatible_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
+    date_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    price_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    logistics_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    quality_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    reliability_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    volume_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    total_score: Mapped[Decimal]=mapped_column(Numeric(5,2),nullable=False)
+    explanation: Mapped[dict]=mapped_column(JSONB,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class Aggregation(Base):
     __tablename__="aggregations"
     id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     aggregation_ref: Mapped[str]=mapped_column(String(40),unique=True,nullable=False)
-    demand_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("demands.id"),nullable=False)
+    demand_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("demands.id",ondelete="CASCADE"),nullable=False)
     target_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
     proposed_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),default=0,nullable=False)
     accepted_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),default=0,nullable=False)
     status: Mapped[str]=mapped_column(String(30),default="PROPOSING",nullable=False)
+    version: Mapped[int]=mapped_column(Integer,default=1,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class AggregationMember(Base):
@@ -173,19 +181,31 @@ class AggregationMember(Base):
     proposed_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
     accepted_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),default=0,nullable=False)
     status: Mapped[str]=mapped_column(String(30),default="PROPOSED",nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class Commitment(Base):
     __tablename__="commitments"
     id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     commitment_ref: Mapped[str]=mapped_column(String(40),unique=True,nullable=False)
-    aggregation_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("aggregations.id"),nullable=False)
-    aggregation_member_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("aggregation_members.id"),nullable=False)
+    aggregation_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("aggregations.id",ondelete="CASCADE"),nullable=False)
+    aggregation_member_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("aggregation_members.id",ondelete="CASCADE"),unique=True,nullable=False)
     offer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("offers.id"),nullable=False)
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
     quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
-    status: Mapped[str]=mapped_column(String(30),default="PENDING",nullable=False)
+    status: Mapped[str]=mapped_column(String(20),default="PENDING",nullable=False)
     expires_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),nullable=False)
     responded_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
+
+class DomainEvent(Base):
+    __tablename__="domain_events"
+    id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
+    event_type: Mapped[str]=mapped_column(String(100),nullable=False)
+    aggregate_type: Mapped[str]=mapped_column(String(100),nullable=False)
+    aggregate_id: Mapped[str]=mapped_column(String(100),nullable=False)
+    payload: Mapped[dict]=mapped_column(JSONB,nullable=False)
+    created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
+    published_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True))
 
 class Order(Base):
     __tablename__="orders"
@@ -207,18 +227,7 @@ class OrderAllocation(Base):
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
     quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
     status: Mapped[str]=mapped_column(String(30),default="ALLOCATED",nullable=False)
-
-class DomainEvent(Base):
-    __tablename__="domain_events"
-    id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
-    event_type: Mapped[str]=mapped_column(String(100),nullable=False)
-    aggregate_type: Mapped[str]=mapped_column(String(50),nullable=False)
-    aggregate_id: Mapped[str]=mapped_column(String(100),nullable=False)
-    payload: Mapped[dict]=mapped_column(JSONB,nullable=False)
-    status: Mapped[str]=mapped_column(String(20),default="PENDING",nullable=False)
-    attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
-    published_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True))
 
 class CollectionEvent(Base):
     __tablename__="collection_events"
