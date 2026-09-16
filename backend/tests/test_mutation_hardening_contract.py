@@ -3,7 +3,7 @@ BASE=Path(__file__).parents[1]/"app"
 def source(rel):return (BASE/rel).read_text()
 def test_commitments_have_object_ownership():
     s=source("commitments/router.py")
-    assert "farmer_for_user" in s and "COMMITMENT_FORBIDDEN" in s
+    assert "farmer_for_user" in s and "COMMITMENT_NOT_OWNED" in s
 def test_sensitive_mutations_require_idempotency_header():
     for rel in ["aggregation/router.py","orders/router.py","collection/router.py",
                 "logistics/router.py","deliveries/router.py","payments/router.py"]:
