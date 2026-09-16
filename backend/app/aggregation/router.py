@@ -10,6 +10,15 @@ from app.database.session import get_db
 
 router=APIRouter(tags=["Aggregation"])
 
+
+def _require_aggregation_buyer(db:Session,user:User,agg:Aggregation)->Buyer:
+    demand=db.get(Demand,agg.demand_id)
+    buyer=db.scalar(select(Buyer).where(Buyer.user_id==user.id))
+    if not demand or not buyer or demand.buyer_id!=buyer.id:
+        raise HTTPException(status_code=403,detail="AGGREGATION_ACCESS_DENIED")
+    return buyer
+
+
 @router.post("/demands/{demand_id}/aggregate")
 def aggregate(demand_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(get_current_user),
               idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
@@ -29,6 +38,7 @@ def aggregate(demand_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(g
 def get_aggregation(aggregation_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(get_current_user)):
     agg=db.get(Aggregation,aggregation_id)
     if not agg:raise HTTPException(status_code=404,detail="AGGREGATION_NOT_FOUND")
+    _require_aggregation_buyer(db,user,agg)
     members=db.execute(select(AggregationMember,Offer,Farmer,Commitment)
         .join(Offer,AggregationMember.offer_id==Offer.id)
         .join(Farmer,Offer.farmer_id==Farmer.id)
