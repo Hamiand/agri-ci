@@ -83,6 +83,35 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     assert settlement.json()["settlement_basis"]=="DELIVERED_QUANTITY";prepared=settlement.json()["prepared"];assert len(prepared)==4 and sum(x["delivered_quantity_kg"] for x in prepared)==3000.0 and sum(x["gross_amount_xof"] for x in prepared)==2280000.0
     settlement_replay=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement_replay.status_code==200 and settlement_replay.json()==settlement.json()
     payments=client.get(f"/payments?order_id={order_id}",headers=ops_headers);assert payments.status_code==200 and len(payments.json())==4
+
+    # Accounting acceptance gate: each farmer payment must reconcile exactly and the campaign
+    # must preserve the authorized 70k + 45k + 15k deductions without rounding leakage.
+    total_gross=Decimal("0");total_deductions=Decimal("0");total_net=Decimal("0")
+    deduction_totals={"TRANSPORT":Decimal("0"),"AGRI_CI_SERVICE":Decimal("0"),"OTHER_AUTHORIZED":Decimal("0")}
+    for payment in payments.json():
+        gross=Decimal(str(payment["gross_amount_xof"]));deductions=Decimal(str(payment["deductions_xof"]));net=Decimal(str(payment["net_amount_xof"]))
+        assert gross-deductions==net
+        ledger=client.get(f"/payments/{payment['id']}/ledger",headers=ops_headers);assert ledger.status_code==200,ledger.text
+        entries=ledger.json()["entries"]
+        assert [entry["type"] for entry in entries].count("GROSS")==1
+        assert [entry["type"] for entry in entries].count("DEDUCTION")==3
+        assert [entry["type"] for entry in entries].count("NET_DUE")==1
+        ledger_gross=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="GROSS"),Decimal("0"))
+        ledger_deductions=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="DEDUCTION"),Decimal("0"))
+        ledger_net=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="NET_DUE"),Decimal("0"))
+        assert ledger_gross==gross and ledger_deductions==deductions and ledger_net==net
+        assert ledger_gross-ledger_deductions==ledger_net
+        for entry in entries:
+            if entry["type"]!="DEDUCTION":continue
+            description=entry["description"]
+            deduction_type=description.split(":",1)[0]
+            assert deduction_type in deduction_totals
+            deduction_totals[deduction_type]+=Decimal(str(entry["amount_xof"]))
+        total_gross+=gross;total_deductions+=deductions;total_net+=net
+    assert total_gross==Decimal("2280000.00")
+    assert deduction_totals=={"TRANSPORT":Decimal("70000.00"),"AGRI_CI_SERVICE":Decimal("45000.00"),"OTHER_AUTHORIZED":Decimal("15000.00")}
+    assert total_deductions==Decimal("130000.00") and total_net==Decimal("2150000.00")
+
     first_payment=payments.json()[0]
     success_headers={**ops_headers,"Idempotency-Key":f"provider-success-{suffix}"};success_payload={"provider_reference":f"PILOT-{suffix}"}
     success=client.post(f"/payments/{first_payment['id']}/provider-success",headers=success_headers,json=success_payload);assert success.status_code==200,success.text
