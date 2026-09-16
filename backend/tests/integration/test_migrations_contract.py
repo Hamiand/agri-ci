@@ -12,3 +12,9 @@ REQUIRED_TABLES={
 def test_required_tables_exist():
     tables=set(inspect(engine).get_table_names())
     assert REQUIRED_TABLES <= tables
+
+def test_payment_intents_track_settled_delivery_quantity():
+    columns={column["name"]:column for column in inspect(engine).get_columns("payment_intents")}
+    assert "settled_quantity_kg" in columns
+    assert columns["settled_quantity_kg"]["type"].precision==14
+    assert columns["settled_quantity_kg"]["type"].scale==3
