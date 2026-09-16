@@ -43,7 +43,11 @@ def propose_from_matches(db:Session,demand:Demand)->Aggregation:
     agg.status="AWAITING_COMMITMENTS" if agg.proposed_quantity_kg>0 else "INSUFFICIENT_SUPPLY"
     _event(db,"AGGREGATION_PROPOSED","AGGREGATION",agg.id,
            {"target_kg":float(agg.target_quantity_kg),"proposed_kg":float(agg.proposed_quantity_kg)})
-    db.commit();db.refresh(agg)
+    # Deliberately do not commit here. The HTTP application boundary owns the
+    # transaction so the aggregation mutation and IdempotencyKey response are
+    # committed together by complete_idempotent(). This prevents a crash from
+    # leaving committed stock reservations without a replayable response.
+    db.flush()
     return agg
 
 def refill_declined_quantity(db:Session,agg:Aggregation,excluded_offer_ids:set|None=None)->Decimal:
