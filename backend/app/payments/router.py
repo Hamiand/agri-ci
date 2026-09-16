@@ -118,8 +118,6 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
     allocations=db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all()
     if not allocations:raise HTTPException(status_code=409,detail="ORDER_HAS_NO_ALLOCATIONS")
 
-    # Commercial settlement is based on delivered produce, not merely collected produce.
-    # Multiple allocations for the same farmer are consolidated into one PaymentIntent.
     delivered_by_farmer=_delivered_quantity_by_farmer(db,order.id)
     prepared=[]
     total_delivered=sum(delivered_by_farmer.values(),Decimal("0"))
@@ -168,14 +166,20 @@ class ProviderSuccess(BaseModel):
 
 @router.post("/{payment_id}/provider-success")
 def provider_success(payment_id:uuid.UUID,p:ProviderSuccess,db:Session=Depends(get_db),
-                     user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN"))):
+                     user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),
+                     idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
     if os.getenv("APP_ENV","development") == "production":
         raise HTTPException(status_code=404,detail="NOT_FOUND")
+    endpoint=f"/payments/{payment_id}/provider-success"
+    idem=begin_idempotent(db,user,endpoint,idempotency_key,
+        {"payment_id":str(payment_id),**p.model_dump(mode="json")})
+    if idem.response_body is not None:return idem.response_body
     pay=db.scalar(select(PaymentIntent).where(PaymentIntent.id==payment_id).with_for_update())
     if not pay:raise HTTPException(status_code=404,detail="PAYMENT_NOT_FOUND")
-    pay=mark_provider_success(db,pay,p.provider_reference);db.commit()
-    return {"payment_ref":pay.payment_ref,"status":pay.status,
+    pay=mark_provider_success(db,pay,p.provider_reference);db.flush()
+    body={"payment_ref":pay.payment_ref,"status":pay.status,
       "provider_reference":pay.provider_reference,"net_amount_xof":float(pay.net_amount_xof)}
+    return complete_idempotent(db,idem,200,body)
 
 @router.get("/{payment_id}/ledger")
 def ledger(payment_id:uuid.UUID,db:Session=Depends(get_db),
