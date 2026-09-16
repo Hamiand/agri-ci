@@ -37,8 +37,8 @@ app = FastAPI(
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_middleware(RequestIdMiddleware)
 
-# CORS_ORIGINS is supplied by the deployment environment and parsed by Settings.
-CORS_ORIGINS = settings.cors_origins
+# CORS_ORIGINS is supplied by the deployment environment as a comma-separated value.
+CORS_ORIGINS = settings.cors_origin_list
 if CORS_ORIGINS:
     app.add_middleware(
         CORSMiddleware,
