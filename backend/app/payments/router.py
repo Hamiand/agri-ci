@@ -83,13 +83,20 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
     if not order:raise HTTPException(status_code=404,detail="ORDER_NOT_FOUND")
     allocations=db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all()
     if not allocations:raise HTTPException(status_code=409,detail="ORDER_HAS_NO_ALLOCATIONS")
-    prepared=[]
+
+    # A farmer can have several allocations in one order (for example after a refill).
+    # Settlement is commercial-account based: aggregate all physically received allocations
+    # for that farmer before creating the single order/farmer PaymentIntent.
+    received_by_farmer:dict[uuid.UUID,Decimal]={}
     for allocation in allocations:
         received=Decimal(db.scalar(select(func.coalesce(func.sum(CollectionEvent.received_quantity_kg),0))
             .where(CollectionEvent.order_allocation_id==allocation.id)) or 0)
-        if received<=0:continue
+        if received>0:
+            received_by_farmer[allocation.farmer_id]=received_by_farmer.get(allocation.farmer_id,Decimal("0"))+received
+
+    prepared=[]
+    for farmer_id,received in received_by_farmer.items():
         gross=(received*p.price_xof_per_kg).quantize(Decimal("0.01"))
-        # Operational deductions are distributed proportionally to the farmer's received share.
         share=received/Decimal(order.quantity_kg)
         deductions=[
           DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",
@@ -98,9 +105,9 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
                       amount_xof=(p.service_xof*share).quantize(Decimal("0.01"))),
           DeductionIn(deduction_type="OTHER_AUTHORIZED",description="Other authorized cost",
                       amount_xof=(p.other_xof*share).quantize(Decimal("0.01")))]
-        pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=allocation.farmer_id,
+        pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,
             gross_amount_xof=gross,deductions=deductions,provider=p.provider))
-        prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(allocation.farmer_id),
+        prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),
           "received_quantity_kg":float(received),"gross_amount_xof":float(pay.gross_amount_xof),
           "net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
     if not prepared:raise HTTPException(status_code=409,detail="NO_COLLECTED_QUANTITY_TO_SETTLE")
