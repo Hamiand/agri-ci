@@ -21,7 +21,7 @@ def owned_commitment(db, user, commitment_id):
     if not commitment:
         raise HTTPException(status_code=404, detail="COMMITMENT_NOT_FOUND")
     if not farmer or commitment.farmer_id != farmer.id:
-        raise HTTPException(status_code=403, detail="COMMITMENT_FORBIDDEN")
+        raise HTTPException(status_code=403, detail="COMMITMENT_NOT_OWNED")
     if commitment.status != "PENDING":
         raise HTTPException(status_code=409, detail="COMMITMENT_ALREADY_RESOLVED")
     if commitment.expires_at < datetime.now(timezone.utc):
