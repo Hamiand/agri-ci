@@ -51,8 +51,8 @@ def test_completed_response_is_replayed_and_payload_change_rejected():
     engine.dispose()
 
 
-def test_concurrent_first_use_creates_only_one_persisted_idempotency_key():
-    """Two simultaneous first-use requests must never create two executable keys."""
+def test_concurrent_first_use_creates_one_operation_and_replays_one_response():
+    """Concurrent first use may replay after the winner commits, but never executes twice."""
     engine, Session = _session_factory()
     suffix = uuid.uuid4().hex[:10]
     with Session.begin() as db:
@@ -74,10 +74,14 @@ def test_concurrent_first_use_creates_only_one_persisted_idempotency_key():
             barrier.wait(timeout=10)
             try:
                 row = begin_idempotent(db, user, endpoint, key, payload)
-                # Keep the winning transaction alive long enough for the other
-                # request to contend on the unique PostgreSQL constraint.
-                complete_idempotent(db, row, 201, {"worker": worker_id, "reserved_kg": 400})
-                result = ("completed", worker_id)
+                if row.response_body is not None:
+                    # The competing request lost the INSERT race, waited for the
+                    # winner to commit, and receives the winner's persisted reply.
+                    result = ("replayed", row.response_body)
+                else:
+                    body = {"worker": worker_id, "reserved_kg": 400}
+                    returned = complete_idempotent(db, row, 201, body)
+                    result = ("executed", returned)
             except HTTPException as exc:
                 db.rollback()
                 result = ("http", exc.status_code, exc.detail)
@@ -96,11 +100,17 @@ def test_concurrent_first_use_creates_only_one_persisted_idempotency_key():
 
     assert not [r for r in results if r[0] == "unexpected"], results
     assert len(results) == 2, results
-    assert len([r for r in results if r[0] == "completed"]) == 1, results
-    rejected = [r for r in results if r[0] == "http"]
-    assert len(rejected) == 1, results
-    assert rejected[0][1] == 409
-    assert rejected[0][2] == "IDEMPOTENT_REQUEST_IN_PROGRESS"
+    executed = [r for r in results if r[0] == "executed"]
+    replayed = [r for r in results if r[0] == "replayed"]
+    in_progress = [r for r in results if r[0] == "http"]
+    assert len(executed) == 1, results
+    # Depending on PostgreSQL scheduling, the loser either observes the
+    # completed response or receives an in-progress conflict. Both are safe.
+    assert len(replayed) + len(in_progress) == 1, results
+    if replayed:
+        assert replayed[0][1] == executed[0][1], results
+    if in_progress:
+        assert in_progress[0][1:] == (409, "IDEMPOTENT_REQUEST_IN_PROGRESS"), results
 
     with Session() as db:
         count = db.scalar(select(func.count()).select_from(IdempotencyKey).where(
@@ -115,5 +125,6 @@ def test_concurrent_first_use_creates_only_one_persisted_idempotency_key():
             IdempotencyKey.key == key,
         ))
         assert persisted.response_status == 201
+        assert persisted.response_body == executed[0][1]
         assert persisted.response_body["reserved_kg"] == 400
     engine.dispose()
