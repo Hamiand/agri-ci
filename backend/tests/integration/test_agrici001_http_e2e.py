@@ -82,12 +82,13 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     forbidden_depart=client.post(f"/transport-jobs/{transport_id}/depart",headers={**other_transporter_headers,"Idempotency-Key":f"wrong-transporter-depart-{suffix}"});assert forbidden_depart.status_code==403,forbidden_depart.text
     ops_jobs=client.get("/transport-jobs",headers=ops_headers);assert ops_jobs.status_code==200 and transport_id in [x["id"] for x in ops_jobs.json()]
     departed=client.post(f"/transport-jobs/{transport_id}/depart",headers={**transporter_headers,"Idempotency-Key":f"depart-{suffix}"});assert departed.status_code==200 and departed.json()["status"]=="IN_TRANSIT"
+    settlement_payload={"price_xof_per_kg":760,"transport_xof":70000,"service_xof":45000,"other_xof":15000,"provider":"PILOT_PROVIDER"}
+    no_delivery=client.post(f"/payments/orders/{order_id}/prepare",headers={**ops_headers,"Idempotency-Key":f"settlement-before-delivery-{suffix}"},json=settlement_payload);assert no_delivery.status_code==409,no_delivery.text;assert no_delivery.json()["detail"]=="NO_DELIVERED_QUANTITY_TO_SETTLE"
     delivered=client.post("/deliveries",headers={**ops_headers,"Idempotency-Key":f"delivery-{suffix}"},json={"transport_job_id":transport_id,"delivered_quantity_kg":3000,"received_by":"Acheteur Abidjan"});assert delivered.status_code==201,delivered.text
-    settlement_payload={"price_xof_per_kg":760,"transport_xof":70000,"service_xof":45000,"other_xof":15000,"provider":"PILOT_PROVIDER"};settlement_headers={**ops_headers,"Idempotency-Key":f"settlement-{suffix}"}
-    settlement=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement.status_code==200,settlement.text
-    assert settlement.json()["settlement_basis"]=="DELIVERED_QUANTITY";prepared=settlement.json()["prepared"];assert len(prepared)==4 and sum(x["delivered_quantity_kg"] for x in prepared)==3000.0 and sum(x["gross_amount_xof"] for x in prepared)==2280000.0
+    settlement_headers={**ops_headers,"Idempotency-Key":f"settlement-{suffix}"};settlement=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement.status_code==200,settlement.text
+    assert settlement.json()["settlement_basis"]=="DELIVERED_QUANTITY";prepared=settlement.json()["prepared"];assert len(prepared)==4 and all(x["status"]=="PENDING" for x in prepared) and sum(x["delivered_quantity_kg"] for x in prepared)==3000.0 and sum(x["gross_amount_xof"] for x in prepared)==2280000.0
     settlement_replay=client.post(f"/payments/orders/{order_id}/prepare",headers=settlement_headers,json=settlement_payload);assert settlement_replay.status_code==200 and settlement_replay.json()==settlement.json()
-    payments=client.get(f"/payments?order_id={order_id}",headers=ops_headers);assert payments.status_code==200 and len(payments.json())==4
+    payments=client.get(f"/payments?order_id={order_id}",headers=ops_headers);assert payments.status_code==200 and len(payments.json())==4 and all(x["status"]=="PENDING" for x in payments.json())
     total_gross=Decimal("0");total_deductions=Decimal("0");total_net=Decimal("0");deduction_totals={"TRANSPORT":Decimal("0"),"AGRI_CI_SERVICE":Decimal("0"),"OTHER_AUTHORIZED":Decimal("0")}
     for payment in payments.json():
         gross=Decimal(str(payment["gross_amount_xof"]));deductions=Decimal(str(payment["deductions_xof"]));net=Decimal(str(payment["net_amount_xof"]));assert gross-deductions==net
