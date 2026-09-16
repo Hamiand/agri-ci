@@ -100,7 +100,7 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
     for farmer_id,delivered_qty in weights:
         gross=(delivered_qty*p.price_xof_per_kg).quantize(CENT,rounding=ROUND_HALF_UP);deductions=[DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",amount_xof=transport_parts[farmer_id]),DeductionIn(deduction_type="AGRI_CI_SERVICE",description="Service AGRI-CI",amount_xof=service_parts[farmer_id]),DeductionIn(deduction_type="OTHER_AUTHORIZED",description="Other authorized cost",amount_xof=other_parts[farmer_id])]
         pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,gross_amount_xof=gross,deductions=deductions,provider=p.provider),settled_quantity_kg=delivered_qty,allow_additional=True);prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),"delivered_quantity_kg":float(delivered_qty),"gross_amount_xof":float(pay.gross_amount_xof),"net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
-    return complete_idempotent(db,idem,200,{"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY_INCREMENT","prepared":prepared})
+    return complete_idempotent(db,idem,200,{"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY","settlement_mode":"INCREMENTAL_UNSETTLED_QUANTITY","prepared":prepared})
 
 @router.get("/farmer/me")
 def farmer_payments(db:Session=Depends(get_db),user:User=Depends(get_current_user)):
