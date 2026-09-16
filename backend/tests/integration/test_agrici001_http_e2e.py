@@ -10,18 +10,18 @@ pytestmark = [
 ]
 
 
-def test_agrici001_http_security_and_idempotency_smoke(client):
+def test_agrici001_http_security_and_idempotency_smoke(app_client):
     """Prove health and anonymous protection at the HTTP boundary."""
-    health = client.get("/health")
+    health = app_client.get("/health")
     assert health.status_code == 200
 
-    protected = client.get("/farmers/me")
+    protected = app_client.get("/farmers/me")
     assert protected.status_code in (401, 403)
 
 
-def test_mutation_without_auth_is_rejected_before_business_processing(client):
+def test_mutation_without_auth_is_rejected_before_business_processing(app_client):
     """A protected aggregation mutation cannot be invoked anonymously."""
-    response = client.post(
+    response = app_client.post(
         "/demands/00000000-0000-0000-0000-000000000001/aggregate"
     )
     assert response.status_code in (401, 403)
