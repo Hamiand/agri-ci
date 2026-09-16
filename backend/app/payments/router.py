@@ -3,7 +3,7 @@ import uuid
 from decimal import Decimal,ROUND_HALF_UP
 from fastapi import APIRouter,Depends,HTTPException,Header
 from pydantic import BaseModel,Field
-from sqlalchemy import func,select
+from sqlalchemy import func,select,text
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user,require_roles
 from app.core.idempotency_service import begin_idempotent,complete_idempotent
@@ -27,20 +27,23 @@ class PaymentCreate(BaseModel):
     deductions:list[DeductionIn]=Field(default_factory=list)
     provider:str=Field(min_length=2,max_length=50)
 
-def _create_payment(db:Session,p:PaymentCreate):
+def _create_payment(db:Session,p:PaymentCreate,settled_quantity_kg:Decimal|None=None,allow_additional:bool=False):
     order=db.get(Order,p.order_id);farmer=db.get(Farmer,p.farmer_id)
     if not order:raise HTTPException(status_code=404,detail="ORDER_NOT_FOUND")
     if not farmer:raise HTTPException(status_code=404,detail="FARMER_NOT_FOUND")
     allocation=db.scalar(select(OrderAllocation).where(OrderAllocation.order_id==order.id,OrderAllocation.farmer_id==farmer.id))
     if not allocation:raise HTTPException(status_code=409,detail="FARMER_NOT_ALLOCATED_TO_ORDER")
-    existing=db.scalar(select(PaymentIntent).where(PaymentIntent.order_id==order.id,PaymentIntent.farmer_id==farmer.id))
-    if existing:return existing
+    existing=db.scalar(select(PaymentIntent).where(PaymentIntent.order_id==order.id,PaymentIntent.farmer_id==farmer.id).order_by(PaymentIntent.created_at))
+    if existing and not allow_additional:return existing
     if any(d.deduction_type not in ALLOWED_DEDUCTIONS for d in p.deductions):raise HTTPException(status_code=422,detail="INVALID_DEDUCTION_TYPE")
     amounts=[d.amount_xof for d in p.deductions]
     try:net=compute_net(p.gross_amount_xof,amounts)
     except ValueError:raise HTTPException(status_code=422,detail="INVALID_PAYMENT_AMOUNTS")
     total=sum(amounts,Decimal("0"));pay=PaymentIntent(payment_ref=f"PAY-{uuid.uuid4().hex[:10].upper()}",order_id=order.id,farmer_id=farmer.id,gross_amount_xof=p.gross_amount_xof,deductions_xof=total,net_amount_xof=net,currency="XOF",provider=p.provider,status="PENDING")
-    db.add(pay);db.flush();add_ledger(db,pay,"GROSS",p.gross_amount_xof,"Gross commercial amount")
+    db.add(pay);db.flush()
+    if settled_quantity_kg is not None:
+        db.execute(text("UPDATE payment_intents SET settled_quantity_kg=:qty WHERE id=:payment_id"),{"qty":settled_quantity_kg,"payment_id":pay.id})
+    add_ledger(db,pay,"GROSS",p.gross_amount_xof,"Gross commercial amount")
     for d in p.deductions:
         db.add(PaymentDeduction(payment_intent_id=pay.id,deduction_type=d.deduction_type,description=d.description,amount_xof=d.amount_xof));add_ledger(db,pay,"DEDUCTION",d.amount_xof,f"{d.deduction_type}: {d.description}")
     add_ledger(db,pay,"NET_DUE",net,"Net amount due to farmer");return pay
@@ -77,20 +80,27 @@ def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID
     delivered=dict(db.execute(select(Delivery.transport_job_id,func.sum(Delivery.delivered_quantity_kg)).where(Delivery.order_id==order_id,Delivery.status=="DELIVERED").group_by(Delivery.transport_job_id)).all())
     sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg).join(Lot,Lot.id==TransportJobLot.lot_id).join(LotSource,LotSource.lot_id==Lot.id).join(QualityCheck,QualityCheck.id==LotSource.quality_check_id).join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id).join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id).where(Lot.order_id==order_id)).all();return _attribute_delivery_sources(capacities,delivered,sources)
 
+def _already_settled_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
+    rows=db.execute(text("SELECT farmer_id, COALESCE(SUM(settled_quantity_kg),0) FROM payment_intents WHERE order_id=:order_id GROUP BY farmer_id"),{"order_id":order_id}).all()
+    return {farmer_id:Decimal(quantity or 0) for farmer_id,quantity in rows}
+
 @router.post("/orders/{order_id}/prepare")
 def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
     idem=begin_idempotent(db,user,f"/payments/orders/{order_id}/prepare",idempotency_key,{"order_id":str(order_id),**p.model_dump(mode="json")})
     if idem.response_body is not None:return idem.response_body
-    order=db.get(Order,order_id)
+    order=db.scalar(select(Order).where(Order.id==order_id).with_for_update())
     if not order:raise HTTPException(status_code=404,detail="ORDER_NOT_FOUND")
     if not db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all():raise HTTPException(status_code=409,detail="ORDER_HAS_NO_ALLOCATIONS")
     delivered_by_farmer=_delivered_quantity_by_farmer(db,order.id);total_delivered=sum(delivered_by_farmer.values(),Decimal("0"))
     if total_delivered<=0:raise HTTPException(status_code=409,detail="NO_DELIVERED_QUANTITY_TO_SETTLE")
-    weights=list(delivered_by_farmer.items());transport_parts=_allocate_money_exact(p.transport_xof,weights);service_parts=_allocate_money_exact(p.service_xof,weights);other_parts=_allocate_money_exact(p.other_xof,weights);prepared=[]
+    already_settled=_already_settled_quantity_by_farmer(db,order.id)
+    incremental={farmer_id:(delivered_qty-already_settled.get(farmer_id,Decimal("0"))).quantize(Decimal("0.001")) for farmer_id,delivered_qty in delivered_by_farmer.items() if delivered_qty>already_settled.get(farmer_id,Decimal("0"))}
+    if not incremental:raise HTTPException(status_code=409,detail="NO_NEW_DELIVERED_QUANTITY_TO_SETTLE")
+    weights=list(incremental.items());transport_parts=_allocate_money_exact(p.transport_xof,weights);service_parts=_allocate_money_exact(p.service_xof,weights);other_parts=_allocate_money_exact(p.other_xof,weights);prepared=[]
     for farmer_id,delivered_qty in weights:
         gross=(delivered_qty*p.price_xof_per_kg).quantize(CENT,rounding=ROUND_HALF_UP);deductions=[DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",amount_xof=transport_parts[farmer_id]),DeductionIn(deduction_type="AGRI_CI_SERVICE",description="Service AGRI-CI",amount_xof=service_parts[farmer_id]),DeductionIn(deduction_type="OTHER_AUTHORIZED",description="Other authorized cost",amount_xof=other_parts[farmer_id])]
-        pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,gross_amount_xof=gross,deductions=deductions,provider=p.provider));prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),"delivered_quantity_kg":float(delivered_qty),"gross_amount_xof":float(pay.gross_amount_xof),"net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
-    return complete_idempotent(db,idem,200,{"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY","prepared":prepared})
+        pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,gross_amount_xof=gross,deductions=deductions,provider=p.provider),settled_quantity_kg=delivered_qty,allow_additional=True);prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),"delivered_quantity_kg":float(delivered_qty),"gross_amount_xof":float(pay.gross_amount_xof),"net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
+    return complete_idempotent(db,idem,200,{"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY_INCREMENT","prepared":prepared})
 
 @router.get("/farmer/me")
 def farmer_payments(db:Session=Depends(get_db),user:User=Depends(get_current_user)):
