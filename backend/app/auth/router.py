@@ -38,11 +38,15 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     user = db.scalar(select(User).where(User.phone == payload.phone))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="INVALID_CREDENTIALS")
+    if user.status != "ACTIVE":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="USER_NOT_ACTIVE")
     roles = roles_for(db, user.id)
-    token = create_access_token(str(user.id), roles)
-    return TokenResponse(access_token=token,
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), roles),
+        refresh_token=create_refresh_token(str(user.id), roles),
         user=UserResponse(id=user.id, phone=user.phone, preferred_language=user.preferred_language,
-                          status=user.status, roles=roles))
+                          status=user.status, roles=roles),
+    )
 
 class RefreshRequest(BaseModel):
     refresh_token: str
@@ -58,7 +62,11 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=401, detail="INVALID_REFRESH_TOKEN")
     if decoded.get("type") != "refresh":
         raise HTTPException(status_code=401, detail="INVALID_TOKEN_TYPE")
-    user = db.get(User, uuid.UUID(decoded["sub"]))
+    try:
+        user_id = uuid.UUID(decoded["sub"])
+    except (KeyError, ValueError, TypeError):
+        raise HTTPException(status_code=401, detail="INVALID_REFRESH_TOKEN")
+    user = db.get(User, user_id)
     if not user or user.status != "ACTIVE":
         raise HTTPException(status_code=401, detail="USER_NOT_ACTIVE")
     roles = roles_for(db, user.id)
