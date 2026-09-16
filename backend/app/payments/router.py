@@ -39,8 +39,7 @@ def _create_payment(db:Session,p:PaymentCreate):
     amounts=[d.amount_xof for d in p.deductions]
     try:net=compute_net(p.gross_amount_xof,amounts)
     except ValueError:raise HTTPException(status_code=422,detail="INVALID_PAYMENT_AMOUNTS")
-    total=sum(amounts,Decimal("0"))
-    pay=PaymentIntent(payment_ref=f"PAY-{uuid.uuid4().hex[:10].upper()}",order_id=order.id,farmer_id=farmer.id,gross_amount_xof=p.gross_amount_xof,deductions_xof=total,net_amount_xof=net,currency="XOF",provider=p.provider,status="PENDING")
+    total=sum(amounts,Decimal("0"));pay=PaymentIntent(payment_ref=f"PAY-{uuid.uuid4().hex[:10].upper()}",order_id=order.id,farmer_id=farmer.id,gross_amount_xof=p.gross_amount_xof,deductions_xof=total,net_amount_xof=net,currency="XOF",provider=p.provider,status="PENDING")
     db.add(pay);db.flush();add_ledger(db,pay,"GROSS",p.gross_amount_xof,"Gross commercial amount")
     for d in p.deductions:
         db.add(PaymentDeduction(payment_intent_id=pay.id,deduction_type=d.deduction_type,description=d.description,amount_xof=d.amount_xof));add_ledger(db,pay,"DEDUCTION",d.amount_xof,f"{d.deduction_type}: {d.description}")
@@ -50,21 +49,20 @@ def _create_payment(db:Session,p:PaymentCreate):
 def create_payment(p:PaymentCreate,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
     idem=begin_idempotent(db,user,"/payments",idempotency_key,p.model_dump(mode="json"))
     if idem.response_body is not None:return idem.response_body
-    pay=_create_payment(db,p);db.flush();body={"payment_id":str(pay.id),"payment_ref":pay.payment_ref,"gross_amount_xof":float(pay.gross_amount_xof),"deductions_xof":float(pay.deductions_xof),"net_amount_xof":float(pay.net_amount_xof),"provider":pay.provider,"status":pay.status};return complete_idempotent(db,idem,201,body)
+    pay=_create_payment(db,p);db.flush();return complete_idempotent(db,idem,201,{"payment_id":str(pay.id),"payment_ref":pay.payment_ref,"gross_amount_xof":float(pay.gross_amount_xof),"deductions_xof":float(pay.deductions_xof),"net_amount_xof":float(pay.net_amount_xof),"provider":pay.provider,"status":pay.status})
 
 class SettlementPrepare(BaseModel):
     price_xof_per_kg:Decimal=Field(gt=0);transport_xof:Decimal=Field(default=0,ge=0);service_xof:Decimal=Field(default=0,ge=0);other_xof:Decimal=Field(default=0,ge=0);provider:str=Field(min_length=2,max_length=50)
 
 def _attribute_delivery_sources(capacities,delivered,sources)->dict[uuid.UUID,Decimal]:
-    result:dict[uuid.UUID,Decimal]={}
+    result={}
     for job_id,farmer_id,source_qty in sources:
         capacity=Decimal(capacities.get(job_id) or 0);delivered_qty=Decimal(delivered.get(job_id) or 0)
         if capacity<=0 or delivered_qty<=0:continue
-        fraction=min(Decimal("1"),delivered_qty/capacity);attributable=(Decimal(source_qty)*fraction).quantize(Decimal("0.001"));result[farmer_id]=result.get(farmer_id,Decimal("0"))+attributable
+        attributable=(Decimal(source_qty)*min(Decimal("1"),delivered_qty/capacity)).quantize(Decimal("0.001"));result[farmer_id]=result.get(farmer_id,Decimal("0"))+attributable
     return result
 
 def _allocate_money_exact(total:Decimal,weighted_items:list[tuple[uuid.UUID,Decimal]])->dict[uuid.UUID,Decimal]:
-    """Proportionally allocate money while guaranteeing the rounded parts equal the rounded total."""
     target=Decimal(total).quantize(CENT,rounding=ROUND_HALF_UP)
     if not weighted_items:return {}
     weight_total=sum((Decimal(weight) for _,weight in weighted_items),Decimal("0"))
@@ -77,8 +75,7 @@ def _allocate_money_exact(total:Decimal,weighted_items:list[tuple[uuid.UUID,Deci
 def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
     capacities=dict(db.execute(select(TransportJobLot.transport_job_id,func.sum(Lot.quantity_kg)).join(Lot,Lot.id==TransportJobLot.lot_id).where(Lot.order_id==order_id).group_by(TransportJobLot.transport_job_id)).all())
     delivered=dict(db.execute(select(Delivery.transport_job_id,func.sum(Delivery.delivered_quantity_kg)).where(Delivery.order_id==order_id,Delivery.status=="DELIVERED").group_by(Delivery.transport_job_id)).all())
-    sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg).join(Lot,Lot.id==TransportJobLot.lot_id).join(LotSource,LotSource.lot_id==Lot.id).join(QualityCheck,QualityCheck.id==LotSource.quality_check_id).join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id).join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id).where(Lot.order_id==order_id)).all()
-    return _attribute_delivery_sources(capacities,delivered,sources)
+    sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg).join(Lot,Lot.id==TransportJobLot.lot_id).join(LotSource,LotSource.lot_id==Lot.id).join(QualityCheck,QualityCheck.id==LotSource.quality_check_id).join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id).join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id).where(Lot.order_id==order_id)).all();return _attribute_delivery_sources(capacities,delivered,sources)
 
 @router.post("/orders/{order_id}/prepare")
 def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
@@ -87,12 +84,11 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
     order=db.get(Order,order_id)
     if not order:raise HTTPException(status_code=404,detail="ORDER_NOT_FOUND")
     if not db.scalars(select(OrderAllocation).where(OrderAllocation.order_id==order.id)).all():raise HTTPException(status_code=409,detail="ORDER_HAS_NO_ALLOCATIONS")
-    delivered_by_farmer=_delivered_quantity_by_farmer(db,order.id);prepared=[];total_delivered=sum(delivered_by_farmer.values(),Decimal("0"))
+    delivered_by_farmer=_delivered_quantity_by_farmer(db,order.id);total_delivered=sum(delivered_by_farmer.values(),Decimal("0"))
     if total_delivered<=0:raise HTTPException(status_code=409,detail="NO_DELIVERED_QUANTITY_TO_SETTLE")
-    weights=list(delivered_by_farmer.items());transport_parts=_allocate_money_exact(p.transport_xof,weights);service_parts=_allocate_money_exact(p.service_xof,weights);other_parts=_allocate_money_exact(p.other_xof,weights)
+    weights=list(delivered_by_farmer.items());transport_parts=_allocate_money_exact(p.transport_xof,weights);service_parts=_allocate_money_exact(p.service_xof,weights);other_parts=_allocate_money_exact(p.other_xof,weights);prepared=[]
     for farmer_id,delivered_qty in weights:
-        gross=(delivered_qty*p.price_xof_per_kg).quantize(CENT,rounding=ROUND_HALF_UP)
-        deductions=[DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",amount_xof=transport_parts[farmer_id]),DeductionIn(deduction_type="AGRI_CI_SERVICE",description="Service AGRI-CI",amount_xof=service_parts[farmer_id]),DeductionIn(deduction_type="OTHER_AUTHORIZED",description="Other authorized cost",amount_xof=other_parts[farmer_id])]
+        gross=(delivered_qty*p.price_xof_per_kg).quantize(CENT,rounding=ROUND_HALF_UP);deductions=[DeductionIn(deduction_type="TRANSPORT",description="Transport AGRI-CI",amount_xof=transport_parts[farmer_id]),DeductionIn(deduction_type="AGRI_CI_SERVICE",description="Service AGRI-CI",amount_xof=service_parts[farmer_id]),DeductionIn(deduction_type="OTHER_AUTHORIZED",description="Other authorized cost",amount_xof=other_parts[farmer_id])]
         pay=_create_payment(db,PaymentCreate(order_id=order.id,farmer_id=farmer_id,gross_amount_xof=gross,deductions=deductions,provider=p.provider));prepared.append({"payment_ref":pay.payment_ref,"farmer_id":str(farmer_id),"delivered_quantity_kg":float(delivered_qty),"gross_amount_xof":float(pay.gross_amount_xof),"net_amount_xof":float(pay.net_amount_xof),"status":pay.status})
     return complete_idempotent(db,idem,200,{"order_id":str(order.id),"settlement_basis":"DELIVERED_QUANTITY","prepared":prepared})
 
@@ -110,7 +106,7 @@ class ProviderSuccess(BaseModel):provider_reference:str
 
 @router.post("/{payment_id}/provider-success")
 def provider_success(payment_id:uuid.UUID,p:ProviderSuccess,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
-    if os.getenv("APP_ENV","development")=="production":raise HTTPException(status_code=404,detail="NOT_FOUND")
+    if os.getenv("APP_ENV","development") == "production":raise HTTPException(status_code=404,detail="NOT_FOUND")
     endpoint=f"/payments/{payment_id}/provider-success";idem=begin_idempotent(db,user,endpoint,idempotency_key,{"payment_id":str(payment_id),**p.model_dump(mode="json")})
     if idem.response_body is not None:return idem.response_body
     pay=db.scalar(select(PaymentIntent).where(PaymentIntent.id==payment_id).with_for_update())
