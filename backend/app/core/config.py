@@ -1,5 +1,4 @@
 from functools import lru_cache
-from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,14 +13,14 @@ class Settings(BaseSettings):
     jwt_access_token_minutes: int = 30
     jwt_refresh_token_days: int = 30
     api_v1_prefix: str = "/api/v1"
-    cors_origins: list[str] = []
+    # Keep the environment representation scalar. Pydantic-settings attempts
+    # JSON decoding for list fields before field validators run, while our
+    # deployment contract intentionally uses a comma-separated CORS_ORIGINS.
+    cors_origins: str = ""
 
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, value):
-        if isinstance(value, str):
-            return [item.strip() for item in value.split(",") if item.strip()]
-        return value
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.cors_origins.split(",") if item.strip()]
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=False)
 
