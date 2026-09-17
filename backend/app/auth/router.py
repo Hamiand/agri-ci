@@ -18,7 +18,10 @@ def roles_for(db: Session, user_id):
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     if db.scalar(select(User).where(User.phone == payload.phone)):
         raise HTTPException(status_code=409, detail="PHONE_ALREADY_REGISTERED")
-    role = db.scalar(select(Role).where(Role.name == payload.role))
+    requested_roles = payload.roles if payload.roles is not None else [payload.role]
+    if len(requested_roles) != 1:
+        raise HTTPException(status_code=422, detail="EXACTLY_ONE_REGISTRATION_ROLE_REQUIRED")
+    role = db.scalar(select(Role).where(Role.name == requested_roles[0]))
     if not role:
         raise HTTPException(status_code=400, detail="INVALID_ROLE")
     user = User(phone=payload.phone, password_hash=hash_password(payload.password),
