@@ -125,4 +125,15 @@ def provider_success(payment_id:uuid.UUID,p:ProviderSuccess,db:Session=Depends(g
 def ledger(payment_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN"))):
     pay=db.get(PaymentIntent,payment_id)
     if not pay:raise HTTPException(status_code=404,detail="PAYMENT_NOT_FOUND")
-    rows=db.scalars(select(LedgerEntry).where(LedgerEntry.payment_intent_id==payment_id).order_by(LedgerEntry.created_at)).all();return {"payment_ref":pay.payment_ref,"entries":[{"entry_ref":r.entry_ref,"type":r.entry_type,"amount_xof":float(r.amount_xof),"description":r.description} for r in rows]}
+    rows=db.scalars(select(LedgerEntry).where(LedgerEntry.payment_intent_id==payment_id).order_by(LedgerEntry.created_at)).all()
+    deductions=db.scalars(select(PaymentDeduction).where(PaymentDeduction.payment_intent_id==payment_id)).all()
+    deduction_codes={(d.description,Decimal(d.amount_xof)):d.deduction_type for d in deductions}
+    entries=[]
+    for r in rows:
+        item={"entry_ref":r.entry_ref,"type":r.entry_type,"amount_xof":float(r.amount_xof),"description":r.description}
+        if r.entry_type=="DEDUCTION":
+            description=r.description.split(": ",1)[1] if ": " in r.description else r.description
+            code=deduction_codes.get((description,Decimal(r.amount_xof)))
+            if code:item["meta"]={"code":code}
+        entries.append(item)
+    return {"payment_ref":pay.payment_ref,"entries":entries}
