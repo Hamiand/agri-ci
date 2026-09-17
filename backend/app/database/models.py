@@ -206,6 +206,9 @@ class DomainEvent(Base):
     payload: Mapped[dict]=mapped_column(JSONB,nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
     published_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True))
+    publish_attempts: Mapped[int]=mapped_column(Integer,default=0,nullable=False)
+    last_publish_error: Mapped[str|None]=mapped_column(Text)
+    last_publish_attempt_at: Mapped[datetime|None]=mapped_column(DateTime(timezone=True))
 
 class Order(Base):
     __tablename__="orders"
@@ -223,9 +226,10 @@ class OrderAllocation(Base):
     __tablename__="order_allocations"
     id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),primary_key=True,default=uuid.uuid4)
     order_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("orders.id",ondelete="CASCADE"),nullable=False)
-    offer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("offers.id"),nullable=False)
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
+    offer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("offers.id"),nullable=False)
     quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
+    unit_price_xof_per_kg: Mapped[Decimal]=mapped_column(Numeric(14,2),nullable=False)
     status: Mapped[str]=mapped_column(String(30),default="ALLOCATED",nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
@@ -236,10 +240,8 @@ class CollectionEvent(Base):
     order_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("orders.id"),nullable=False)
     order_allocation_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("order_allocations.id"),nullable=False)
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
-    announced_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
     received_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
-    location_name: Mapped[str|None]=mapped_column(String(180))
-    status: Mapped[str]=mapped_column(String(30),default="RECEIVED",nullable=False)
+    location_name: Mapped[str]=mapped_column(String(180),nullable=False)
     collected_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class QualityCheck(Base):
