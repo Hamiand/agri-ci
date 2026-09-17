@@ -6,6 +6,8 @@ Plateforme pilote de coordination de transactions agricoles traçables en Côte 
 
 **Commencer ici :** [Index de documentation en français](docs/INDEX_DOCUMENTATION_FR.md)
 
+**État actuel :** [Project Status](docs/PROJECT_STATUS.md)
+
 Documents principaux :
 
 - [Guide utilisateur — Commercial Pilot 1.0 (FR)](docs/GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)
