@@ -1,0 +1,127 @@
+# AGRI-CI DigitalOcean App Platform template
+# Preparation artifact only. It intentionally does not provision paid databases
+# and contains no production secrets. Replace the placeholders only during the
+# authorized DigitalOcean activation step.
+
+name: agri-ci
+
+services:
+  - name: agrci-api
+    github:
+      repo: Hamiand/agri-ci
+      branch: deployment/digitalocean-prep
+      deploy_on_push: false
+    source_dir: backend
+    dockerfile_path: Dockerfile
+    http_port: 8000
+    health_check:
+      http_path: /health
+    instance_count: 1
+    envs:
+      - key: APP_ENV
+        value: production
+        scope: RUN_TIME
+        type: GENERAL
+      - key: APP_DEBUG
+        value: "false"
+        scope: RUN_TIME
+        type: GENERAL
+      - key: JWT_ALGORITHM
+        value: HS256
+        scope: RUN_TIME
+        type: GENERAL
+      - key: JWT_ACCESS_TOKEN_MINUTES
+        value: "30"
+        scope: RUN_TIME
+        type: GENERAL
+      - key: JWT_REFRESH_TOKEN_DAYS
+        value: "30"
+        scope: RUN_TIME
+        type: GENERAL
+      - key: CORS_ORIGINS
+        value: https://www.agri-ci.com
+        scope: RUN_TIME
+        type: GENERAL
+      - key: DATABASE_URL
+        value: REPLACE_WITH_DIGITALOCEAN_POSTGRES_PRIVATE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: REDIS_URL
+        value: REPLACE_WITH_DIGITALOCEAN_VALKEY_OR_REDIS_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_SECRET
+        value: REPLACE_DURING_AUTHORIZED_ACTIVATION
+        scope: RUN_TIME
+        type: SECRET
+      - key: PAYMENT_WEBHOOK_SECRET
+        value: REPLACE_ONLY_WITH_APPROVED_PRODUCTION_VALUE
+        scope: RUN_TIME
+        type: SECRET
+
+  - name: agrci-web
+    github:
+      repo: Hamiand/agri-ci
+      branch: deployment/digitalocean-prep
+      deploy_on_push: false
+    source_dir: web
+    dockerfile_path: Dockerfile
+    http_port: 3000
+    instance_count: 1
+    envs:
+      - key: NEXT_PUBLIC_API_BASE_URL
+        value: https://api.agri-ci.com
+        scope: BUILD_TIME
+        type: GENERAL
+
+workers:
+  - name: agrci-outbox-worker
+    github:
+      repo: Hamiand/agri-ci
+      branch: deployment/digitalocean-prep
+      deploy_on_push: false
+    source_dir: backend
+    dockerfile_path: Dockerfile
+    run_command: python -m app.events.worker
+    instance_count: 1
+    envs:
+      - key: APP_ENV
+        value: production
+        scope: RUN_TIME
+        type: GENERAL
+      - key: DATABASE_URL
+        value: REPLACE_WITH_DIGITALOCEAN_POSTGRES_PRIVATE_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: REDIS_URL
+        value: REPLACE_WITH_DIGITALOCEAN_VALKEY_OR_REDIS_URL
+        scope: RUN_TIME
+        type: SECRET
+      - key: JWT_SECRET
+        value: REPLACE_DURING_AUTHORIZED_ACTIVATION
+        scope: RUN_TIME
+        type: SECRET
+
+jobs:
+  - name: agrci-migrate
+    kind: PRE_DEPLOY
+    github:
+      repo: Hamiand/agri-ci
+      branch: deployment/digitalocean-prep
+      deploy_on_push: false
+    source_dir: backend
+    dockerfile_path: Dockerfile
+    run_command: alembic upgrade head
+    instance_count: 1
+    envs:
+      - key: DATABASE_URL
+        value: REPLACE_WITH_DIGITALOCEAN_POSTGRES_PRIVATE_URL
+        scope: RUN_TIME
+        type: SECRET
+
+# Production managed PostgreSQL/Valkey are intentionally not declared here.
+# During authorized activation, attach existing/created DigitalOcean Managed
+# Databases and replace the placeholders above with bindable variables such as:
+# ${agrci-postgres.DATABASE_PRIVATE_URL}
+# This avoids accidentally provisioning billable database resources from this
+# preparation template.
