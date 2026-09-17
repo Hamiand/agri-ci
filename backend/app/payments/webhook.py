@@ -17,6 +17,11 @@ def valid_signature(raw:bytes,signature:str|None)->bool:
 
 @router.post("/provider")
 async def provider_webhook(request:Request,x_signature:str|None=Header(default=None,alias="X-Signature")):
+    # This endpoint is intentionally generic and exists only for development,
+    # staging and controlled integration proofs. A real payment provider must
+    # have its own production adapter that verifies that provider's documented
+    # signature, timestamp/replay semantics and event identifiers.
+    if os.getenv("APP_ENV","development") == "production":raise HTTPException(status_code=404,detail="NOT_FOUND")
     rate_limit(request,"payment-webhook",limit=120)
     raw=await request.body()
     if not valid_signature(raw,x_signature):raise HTTPException(status_code=401,detail="INVALID_WEBHOOK_SIGNATURE")
