@@ -1,11 +1,12 @@
 import uuid
 from datetime import date
 from decimal import Decimal
-from fastapi import APIRouter,Depends,HTTPException
+from fastapi import APIRouter,Depends,HTTPException,Header
 from pydantic import BaseModel,Field,model_validator
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
+from app.core.idempotency_service import begin_idempotent,complete_idempotent
 from app.database.models import Buyer,Demand,Product,User
 from app.database.session import get_db
 
@@ -35,7 +36,10 @@ class DemandOut(BaseModel):
     model_config={"from_attributes":True}
 
 @router.post("",response_model=DemandOut,status_code=201)
-def create_demand(payload:DemandCreate,db:Session=Depends(get_db),user:User=Depends(get_current_user)):
+def create_demand(payload:DemandCreate,db:Session=Depends(get_db),user:User=Depends(get_current_user),
+                  idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
+    idem=begin_idempotent(db,user,"/demands",idempotency_key,payload.model_dump(mode="json"))
+    if idem.response_body is not None:return idem.response_body
     buyer=db.scalar(select(Buyer).where(Buyer.user_id==user.id))
     product=db.scalar(select(Product).where(Product.code==payload.product_code,Product.active.is_(True)))
     if not buyer: raise HTTPException(status_code=400,detail="BUYER_PROFILE_REQUIRED")
@@ -44,8 +48,13 @@ def create_demand(payload:DemandCreate,db:Session=Depends(get_db),user:User=Depe
         quantity_required_kg=payload.quantity_required_kg,delivery_start_date=payload.delivery_start_date,
         delivery_end_date=payload.delivery_end_date,target_price_xof_per_kg=payload.target_price_xof_per_kg,
         quality_grades=payload.quality_grades,destination_city=payload.destination_city,status="PUBLISHED")
-    db.add(demand);db.commit();db.refresh(demand)
-    return demand
+    db.add(demand);db.flush()
+    body={"id":str(demand.id),"demand_ref":demand.demand_ref,
+        "quantity_required_kg":str(demand.quantity_required_kg),
+        "delivery_start_date":demand.delivery_start_date.isoformat(),
+        "delivery_end_date":demand.delivery_end_date.isoformat(),
+        "quality_grades":demand.quality_grades or [],"status":demand.status}
+    return complete_idempotent(db,idem,201,body)
 
 class MarketDemandOut(BaseModel):
     id:uuid.UUID
