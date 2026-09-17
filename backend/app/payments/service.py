@@ -28,7 +28,7 @@ def mark_provider_success(db:Session,payment:PaymentIntent,provider_reference:st
         raise HTTPException(status_code=409,detail="INVALID_PAYMENT_STATE")
     payment.status="SUCCESS";payment.provider_reference=provider_reference
     payment.updated_at=datetime.now(timezone.utc)
-    add_ledger(db,payment,"PAYMENT_SUCCESS",payment.net_amount_xof,"Net amount paid by licensed payment provider")
+    add_ledger(db,payment,"NET_PAID",payment.net_amount_xof,"Net amount paid by licensed payment provider")
     db.add(DomainEvent(event_type="PAYMENT_SUCCESS",aggregate_type="PAYMENT",
         aggregate_id=str(payment.id),payload={"payment_ref":payment.payment_ref,
         "net_amount_xof":float(payment.net_amount_xof),"provider":payment.provider}))
