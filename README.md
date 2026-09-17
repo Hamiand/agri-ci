@@ -1,7 +1,15 @@
 # AGRI-CI
 
-National agricultural market and logistics orchestration platform for Côte d’Ivoire.
+Plateforme pilote de coordination de transactions agricoles traçables en Côte d'Ivoire.
 
-Current engineering milestone: v0.31 — Executable CI Release Gate.
+## Commercial Pilot Release 1.0
 
-The repository is being prepared for the AGRI-CI 1.0 Commercial Pilot RC1 runtime proof.
+Documentation de référence :
+
+- [Guide utilisateur — Commercial Pilot 1.0 (FR)](docs/GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)
+- [Historique maître AGRI-CI](docs/HISTORIQUE_MAITRE_AGRI_CI.md)
+- [Commercial Pilot Release 1.0 Gate](docs/COMMERCIAL_PILOT_RELEASE_1_0.md)
+- [Controlled Field Pilot Runbook](docs/CONTROLLED_FIELD_PILOT_RUNBOOK.md)
+- [First Pilot Order Control Sheet](docs/FIRST_PILOT_ORDER_CONTROL_SHEET.md)
+
+Le statut « Release 1.0 ready » décrit la barrière technique du logiciel. Il ne constitue pas une preuve que l'infrastructure externe de production, la certification d'un prestataire de paiement, les validations juridiques ou l'onboarding réel des partenaires du pilote sont déjà terminés.
