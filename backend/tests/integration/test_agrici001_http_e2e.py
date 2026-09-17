@@ -49,7 +49,9 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
         offer=client.post("/offers",headers=offer_headers,json=offer_payload);assert offer.status_code==201,offer.text
         offer_replay=client.post("/offers",headers=offer_headers,json=offer_payload);assert offer_replay.status_code==201 and offer_replay.json()==offer.json()
         offer_ids[name]=uuid.UUID(offer.json()["id"])
-    demand=client.post("/demands",headers=buyer_headers,json={"product_code":product_code,"quantity_required_kg":"3000","delivery_start_date":"2027-05-16","delivery_end_date":"2027-05-18","target_price_xof_per_kg":"760","quality_grades":["A","B"],"destination_city":"Abidjan"});assert demand.status_code==201,demand.text
+    demand_headers={**buyer_headers,"Idempotency-Key":f"demand-{suffix}"};demand_payload={"product_code":product_code,"quantity_required_kg":"3000","delivery_start_date":"2027-05-16","delivery_end_date":"2027-05-18","target_price_xof_per_kg":"760","quality_grades":["A","B"],"destination_city":"Abidjan"}
+    demand=client.post("/demands",headers=demand_headers,json=demand_payload);assert demand.status_code==201,demand.text
+    demand_replay=client.post("/demands",headers=demand_headers,json=demand_payload);assert demand_replay.status_code==201 and demand_replay.json()==demand.json()
     demand_id=uuid.UUID(demand.json()["id"]);scores={"Koffi":Decimal("99"),"Awa":Decimal("98"),"Mariam":Decimal("97"),"Yao":Decimal("96"),"Cooperative A":Decimal("95")}
     with Session.begin() as db:
         for name,_ in farmer_specs:
