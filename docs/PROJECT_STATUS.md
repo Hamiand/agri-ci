@@ -19,7 +19,7 @@ Reference documents:
 
 ### User and field documentation
 
-**Available in repository:** French user guide, master project history, readable pilot changelog, controlled field pilot runbook, first-order control sheet, French documentation index, external blocker tracker and post-release activation sequence.
+**Available in repository:** French quick start, French full user guide, master project history, readable pilot changelog, controlled field pilot runbook, first-order control sheet, French documentation index, external blocker tracker, post-release activation sequence and recovery procedure.
 
 ### External go-live readiness
 
@@ -27,9 +27,11 @@ Reference documents:
 
 No claim is made here that production infrastructure, licensed payment-provider certification, legal/privacy approval or real pilot-partner onboarding has been completed.
 
-### Current next step
+### Current decision boundary
 
-Proceed through `NEXT_STEP_AFTER_RELEASE_1_0.md`. The first decisions are real-world pilot choices: product/area and identified participants. These are intentionally not invented by the software repository.
+The autonomous repository/documentation work for recovering and preserving Release 1.0 context is complete. The next phase requires real-world pilot decisions and evidence, beginning with product/area and identified participants, followed by payment provider and production infrastructure choices.
+
+These decisions are intentionally not invented by the software repository.
 
 ### Scope discipline
 
