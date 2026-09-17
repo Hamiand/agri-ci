@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,6 +28,7 @@ from app.payments.router import router as payments_router
 from app.payments.webhook import router as payment_webhook_router
 from app.core.config import get_settings
 from app.core.exceptions import http_exception_handler, validation_exception_handler
+from app.core.logging import log_event
 from app.core.middleware import RequestIdMiddleware
 from app.core.production_middleware import ProductionHeadersMiddleware
 from app.core.production_readiness import production_checks
@@ -67,10 +70,19 @@ for router in [
 
 @app.exception_handler(Exception)
 async def unhandled_exception(request: Request, exc: Exception):
+    trace_id = getattr(request.state, "request_id", None)
+    log_event(
+        logging.ERROR,
+        "api.unhandled_exception",
+        trace_id=trace_id,
+        method=request.method,
+        path=request.url.path,
+        exception_type=type(exc).__name__,
+    )
     return JSONResponse(
         status_code=500,
         content={"error": {"code": "INTERNAL_ERROR", "message": "Une erreur interne est survenue.",
-                           "details": {}, "trace_id": getattr(request.state, "request_id", None)}},
+                           "details": {}, "trace_id": trace_id}},
     )
 
 
