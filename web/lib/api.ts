@@ -28,14 +28,23 @@ async function refreshAccessToken(){
  return true;
 }
 
+function mutationKey(method:string,headers:Headers){
+ if(method==="GET" || method==="HEAD" || headers.has("Idempotency-Key")) return;
+ const cryptoApi=globalThis.crypto;
+ const key=cryptoApi?.randomUUID ? cryptoApi.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+ headers.set("Idempotency-Key",`web-${key}`);
+}
+
 export async function api(path:string,options:RequestInit={},retry=true){
  const token=getToken();const headers=new Headers(options.headers);
+ const method=(options.method||"GET").toUpperCase();
  if(!headers.has("Content-Type") && options.body) headers.set("Content-Type","application/json");
  if(token) headers.set("Authorization",`Bearer ${token}`);
- let r=await fetch(`${API}${path}`,{...options,headers});
+ mutationKey(method,headers);
+ let r=await fetch(`${API}${path}`,{...options,method,headers});
  if(r.status===401 && retry && getRefreshToken()){
   const refreshed=await refreshAccessToken();
-  if(refreshed) return api(path,options,false);
+  if(refreshed) return api(path,{...options,method,headers},false);
  }
  const data=await parse(r);
  if(!r.ok) throw new Error(data?.error?.message||data?.detail||"AGRI-CI request failed");
