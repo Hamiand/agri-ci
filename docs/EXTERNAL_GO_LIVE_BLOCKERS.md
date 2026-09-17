@@ -1,5 +1,7 @@
 # AGRI-CI — External Go-Live Blockers
 
+**Last reviewed from repository evidence: 2026-09-17**
+
 **Purpose:** keep external launch dependencies separate from software completion. A box may be checked only after real evidence exists.
 
 ## 1. Licensed payment provider
