@@ -6,6 +6,7 @@ class RegisterRequest(BaseModel):
     password: str = Field(min_length=10, max_length=128)
     preferred_language: str = "fr"
     role: str = "FARMER"
+    roles: list[str] | None = None
 
 class LoginRequest(BaseModel):
     phone: str
