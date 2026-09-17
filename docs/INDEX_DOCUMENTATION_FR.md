@@ -4,31 +4,31 @@ Ce fichier sert de porte d'entrée durable vers la documentation du Commercial P
 
 ## État actuel
 
-1. `PROJECT_STATUS.md` — statut synthétique durable du projet.
-2. `NEXT_STEP_AFTER_RELEASE_1_0.md` — séquence pratique pour passer de la réussite technique au pilote réel.
+1. [PROJECT_STATUS.md](PROJECT_STATUS.md) — statut synthétique durable du projet.
+2. [NEXT_STEP_AFTER_RELEASE_1_0.md](NEXT_STEP_AFTER_RELEASE_1_0.md) — séquence pratique pour passer de la réussite technique au pilote réel.
 
 ## Pour comprendre le projet
 
-3. `HISTORIQUE_MAITRE_AGRI_CI.md` — évolution du projet, décisions de périmètre et état actuel.
-4. `CHANGELOG_PILOT_1_0.md` — résumé lisible des grandes phases de développement.
-5. `COMMERCIAL_PILOT_RELEASE_1_0.md` — définition officielle de la barrière Release 1.0.
+3. [HISTORIQUE_MAITRE_AGRI_CI.md](HISTORIQUE_MAITRE_AGRI_CI.md) — évolution du projet, décisions de périmètre et état actuel.
+4. [CHANGELOG_PILOT_1_0.md](CHANGELOG_PILOT_1_0.md) — résumé lisible des grandes phases de développement.
+5. [COMMERCIAL_PILOT_RELEASE_1_0.md](COMMERCIAL_PILOT_RELEASE_1_0.md) — définition officielle de la barrière Release 1.0.
 
 ## Pour utiliser AGRI-CI
 
-6. `GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md` — guide français par rôle : producteur, acheteur, collecte/opérations, transport et règlement.
+6. [GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md](GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md) — guide français par rôle : producteur, acheteur, collecte/opérations, transport et règlement.
 
 ## Pour conduire le pilote terrain
 
-7. `CONTROLLED_FIELD_PILOT_RUNBOOK.md` — procédure contrôlée de bout en bout.
-8. `FIRST_PILOT_ORDER_CONTROL_SHEET.md` — fiche de contrôle de la première commande.
+7. [CONTROLLED_FIELD_PILOT_RUNBOOK.md](CONTROLLED_FIELD_PILOT_RUNBOOK.md) — procédure contrôlée de bout en bout.
+8. [FIRST_PILOT_ORDER_CONTROL_SHEET.md](FIRST_PILOT_ORDER_CONTROL_SHEET.md) — fiche de contrôle de la première commande.
 
 ## Pour suivre ce qui bloque encore le go-live réel
 
-9. `EXTERNAL_GO_LIVE_BLOCKERS.md` — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
+9. [EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md) — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
 
 ## Pour maintenir la documentation
 
-10. `DOCUMENTATION_MAINTENANCE.md` — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
+10. [DOCUMENTATION_MAINTENANCE.md](DOCUMENTATION_MAINTENANCE.md) — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
 
 ## Pour vérifier la preuve technique
 
