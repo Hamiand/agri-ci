@@ -1,9 +1,9 @@
 import uuid
-from decimal import Decimal
-from fastapi import APIRouter,Depends,HTTPException
+from fastapi import APIRouter,Depends,HTTPException,Header
 from sqlalchemy import delete,select
 from sqlalchemy.orm import Session
 from app.core.dependencies import get_current_user
+from app.core.idempotency_service import begin_idempotent,complete_idempotent
 from app.database.models import Buyer,Demand,Farmer,Harvest,Match,Offer,User
 from app.database.session import get_db
 from app.matching.engine import date_compatible,score_candidate
@@ -11,7 +11,10 @@ from app.matching.engine import date_compatible,score_candidate
 router=APIRouter(prefix="/demands",tags=["Matching"])
 
 @router.post("/{demand_id}/match")
-def run_matching(demand_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(get_current_user)):
+def run_matching(demand_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depends(get_current_user),
+                 idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
+    idem=begin_idempotent(db,user,f"/demands/{demand_id}/match",idempotency_key,{"demand_id":str(demand_id)})
+    if idem.response_body is not None:return idem.response_body
     demand=db.scalar(select(Demand).where(Demand.id==demand_id))
     buyer=db.scalar(select(Buyer).where(Buyer.user_id==user.id))
     if not demand: raise HTTPException(status_code=404,detail="DEMAND_NOT_FOUND")
@@ -40,7 +43,7 @@ def run_matching(demand_id:uuid.UUID,db:Session=Depends(get_db),user:User=Depend
                         "compatible_quantity_kg":float(compatible),
                         "asking_price_xof_per_kg":float(offer.asking_price_xof_per_kg) if offer.asking_price_xof_per_kg else None,
                         "quality_grade":offer.quality_grade,"total_score":float(total),"components":m.explanation})
-    db.commit()
     results.sort(key=lambda x:x["total_score"],reverse=True)
-    return {"demand_id":str(demand.id),"requested_quantity_kg":float(demand.quantity_required_kg),
-            "compatible_quantity_kg":sum(x["compatible_quantity_kg"] for x in results),"matches":results}
+    body={"demand_id":str(demand.id),"requested_quantity_kg":float(demand.quantity_required_kg),
+          "compatible_quantity_kg":sum(x["compatible_quantity_kg"] for x in results),"matches":results}
+    return complete_idempotent(db,idem,200,body)
