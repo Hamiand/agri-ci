@@ -15,20 +15,21 @@ Ce fichier sert de porte d'entrée durable vers la documentation du Commercial P
 
 ## Pour utiliser AGRI-CI
 
-6. [GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md](GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md) — guide français par rôle : producteur, acheteur, collecte/opérations, transport et règlement.
+6. [USER_GUIDE_QUICK_START_FR.md](USER_GUIDE_QUICK_START_FR.md) — démarrage rapide producteur, acheteur et opérations.
+7. [GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md](GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md) — guide français complet par rôle.
 
 ## Pour conduire le pilote terrain
 
-7. [CONTROLLED_FIELD_PILOT_RUNBOOK.md](CONTROLLED_FIELD_PILOT_RUNBOOK.md) — procédure contrôlée de bout en bout.
-8. [FIRST_PILOT_ORDER_CONTROL_SHEET.md](FIRST_PILOT_ORDER_CONTROL_SHEET.md) — fiche de contrôle de la première commande.
+8. [CONTROLLED_FIELD_PILOT_RUNBOOK.md](CONTROLLED_FIELD_PILOT_RUNBOOK.md) — procédure contrôlée de bout en bout.
+9. [FIRST_PILOT_ORDER_CONTROL_SHEET.md](FIRST_PILOT_ORDER_CONTROL_SHEET.md) — fiche de contrôle de la première commande.
 
 ## Pour suivre ce qui bloque encore le go-live réel
 
-9. [EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md) — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
+10. [EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md) — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
 
 ## Pour maintenir la documentation
 
-10. [DOCUMENTATION_MAINTENANCE.md](DOCUMENTATION_MAINTENANCE.md) — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
+11. [DOCUMENTATION_MAINTENANCE.md](DOCUMENTATION_MAINTENANCE.md) — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
 
 ## Pour vérifier la preuve technique
 
