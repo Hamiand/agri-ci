@@ -28,4 +28,8 @@ Suivi des dépendances externes avant argent réel :
 
 ➡️ **[EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md)**
 
+Procédure de récupération si un historique de conversation n'est plus disponible :
+
+➡️ **[DOCUMENTATION_RECOVERY.md](DOCUMENTATION_RECOVERY.md)**
+
 Les captures d'écran du guide devront être produites à partir de l'environnement pilote réellement déployé ; aucune capture fictive n'est utilisée comme preuve d'interface.
