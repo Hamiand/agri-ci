@@ -19,3 +19,5 @@ Documents principaux :
 - [External Go-Live Blockers](docs/EXTERNAL_GO_LIVE_BLOCKERS.md)
 
 Le statut « Release 1.0 ready » décrit la barrière technique du logiciel. Il ne constitue pas une preuve que l'infrastructure externe de production, la certification d'un prestataire de paiement, les validations juridiques ou l'onboarding réel des partenaires du pilote sont déjà terminés.
+
+La documentation durable du dépôt remplace désormais la dépendance à un historique de conversation pour connaître l'état du projet.
