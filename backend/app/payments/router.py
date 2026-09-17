@@ -39,10 +39,8 @@ def _create_payment(db:Session,p:PaymentCreate,settled_quantity_kg:Decimal|None=
     amounts=[d.amount_xof for d in p.deductions]
     try:net=compute_net(p.gross_amount_xof,amounts)
     except ValueError:raise HTTPException(status_code=422,detail="INVALID_PAYMENT_AMOUNTS")
-    total=sum(amounts,Decimal("0"));pay=PaymentIntent(payment_ref=f"PAY-{uuid.uuid4().hex[:10].upper()}",order_id=order.id,farmer_id=farmer.id,gross_amount_xof=p.gross_amount_xof,deductions_xof=total,net_amount_xof=net,currency="XOF",provider=p.provider,status="PENDING")
+    total=sum(amounts,Decimal("0"));pay=PaymentIntent(payment_ref=f"PAY-{uuid.uuid4().hex[:10].upper()}",order_id=order.id,farmer_id=farmer.id,gross_amount_xof=p.gross_amount_xof,deductions_xof=total,net_amount_xof=net,currency="XOF",provider=p.provider,settled_quantity_kg=settled_quantity_kg,status="PENDING")
     db.add(pay);db.flush()
-    if settled_quantity_kg is not None:
-        db.execute(text("UPDATE payment_intents SET settled_quantity_kg=:qty WHERE id=:payment_id"),{"qty":settled_quantity_kg,"payment_id":pay.id})
     add_ledger(db,pay,"GROSS",p.gross_amount_xof,"Gross commercial amount")
     for d in p.deductions:
         db.add(PaymentDeduction(payment_intent_id=pay.id,deduction_type=d.deduction_type,description=d.description,amount_xof=d.amount_xof));add_ledger(db,pay,"DEDUCTION",d.amount_xof,f"{d.deduction_type}: {d.description}")
@@ -81,10 +79,7 @@ def _delivered_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID
     sources=db.execute(select(TransportJobLot.transport_job_id,OrderAllocation.farmer_id,LotSource.quantity_kg).join(Lot,Lot.id==TransportJobLot.lot_id).join(LotSource,LotSource.lot_id==Lot.id).join(QualityCheck,QualityCheck.id==LotSource.quality_check_id).join(CollectionEvent,CollectionEvent.id==QualityCheck.collection_event_id).join(OrderAllocation,OrderAllocation.id==CollectionEvent.order_allocation_id).where(Lot.order_id==order_id)).all();return _attribute_delivery_sources(capacities,delivered,sources)
 
 def _already_settled_quantity_by_farmer(db:Session,order_id:uuid.UUID)->dict[uuid.UUID,Decimal]:
-    # A prepared/in-flight/successful payment reserves its represented quantity so
-    # retries cannot pay the same kilograms twice. FAILED and REFUNDED payments
-    # deliberately do not reserve quantity: those kilograms must become payable again.
-    rows=db.execute(text("SELECT farmer_id, COALESCE(SUM(settled_quantity_kg),0) FROM payment_intents WHERE order_id=:order_id AND status IN ('PENDING','PROCESSING','SUCCESS','DISPUTED') GROUP BY farmer_id"),{"order_id":order_id}).all()
+    rows=db.execute(select(PaymentIntent.farmer_id,func.coalesce(func.sum(PaymentIntent.settled_quantity_kg),0)).where(PaymentIntent.order_id==order_id,PaymentIntent.status.in_(["PENDING","PROCESSING","SUCCESS","DISPUTED"])).group_by(PaymentIntent.farmer_id)).all()
     return {farmer_id:Decimal(quantity or 0) for farmer_id,quantity in rows}
 
 @router.post("/orders/{order_id}/prepare")
@@ -109,11 +104,11 @@ def prepare_order_settlements(order_id:uuid.UUID,p:SettlementPrepare,db:Session=
 def farmer_payments(db:Session=Depends(get_db),user:User=Depends(get_current_user)):
     farmer=db.scalar(select(Farmer).where(Farmer.user_id==user.id))
     if not farmer:raise HTTPException(status_code=400,detail="FARMER_PROFILE_REQUIRED")
-    rows=db.scalars(select(PaymentIntent).where(PaymentIntent.farmer_id==farmer.id).order_by(PaymentIntent.created_at.desc())).all();return [{"id":str(x.id),"payment_ref":x.payment_ref,"order_id":str(x.order_id),"gross_amount_xof":float(x.gross_amount_xof),"deductions_xof":float(x.deductions_xof),"net_amount_xof":float(x.net_amount_xof),"provider":x.provider,"status":x.status} for x in rows]
+    rows=db.scalars(select(PaymentIntent).where(PaymentIntent.farmer_id==farmer.id).order_by(PaymentIntent.created_at.desc())).all();return [{"id":str(x.id),"payment_ref":x.payment_ref,"order_id":str(x.order_id),"gross_amount_xof":float(x.gross_amount_xof),"deductions_xof":float(x.deductions_xof),"net_amount_xof":float(x.net_amount_xof),"settled_quantity_kg":float(x.settled_quantity_kg) if x.settled_quantity_kg is not None else None,"provider":x.provider,"status":x.status} for x in rows]
 
 @router.get("")
 def list_payments(order_id:uuid.UUID|None=None,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN"))):
-    q=select(PaymentIntent).order_by(PaymentIntent.created_at.desc());q=q.where(PaymentIntent.order_id==order_id) if order_id else q;rows=db.scalars(q).all();return [{"id":str(x.id),"payment_ref":x.payment_ref,"order_id":str(x.order_id),"farmer_id":str(x.farmer_id),"gross_amount_xof":float(x.gross_amount_xof),"deductions_xof":float(x.deductions_xof),"net_amount_xof":float(x.net_amount_xof),"provider":x.provider,"status":x.status} for x in rows]
+    q=select(PaymentIntent).order_by(PaymentIntent.created_at.desc());q=q.where(PaymentIntent.order_id==order_id) if order_id else q;rows=db.scalars(q).all();return [{"id":str(x.id),"payment_ref":x.payment_ref,"order_id":str(x.order_id),"farmer_id":str(x.farmer_id),"gross_amount_xof":float(x.gross_amount_xof),"deductions_xof":float(x.deductions_xof),"net_amount_xof":float(x.net_amount_xof),"settled_quantity_kg":float(x.settled_quantity_kg) if x.settled_quantity_kg is not None else None,"provider":x.provider,"status":x.status} for x in rows]
 
 class ProviderSuccess(BaseModel):provider_reference:str
 
