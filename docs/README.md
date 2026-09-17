@@ -16,6 +16,10 @@ Historique maître :
 
 ➡️ **[HISTORIQUE_MAITRE_AGRI_CI.md](HISTORIQUE_MAITRE_AGRI_CI.md)**
 
+Prochaine étape après Release 1.0 :
+
+➡️ **[NEXT_STEP_AFTER_RELEASE_1_0.md](NEXT_STEP_AFTER_RELEASE_1_0.md)**
+
 Suivi des dépendances externes avant argent réel :
 
 ➡️ **[EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md)**
