@@ -25,6 +25,10 @@ Ce fichier sert de porte d'entrée durable vers la documentation du Commercial P
 
 8. `EXTERNAL_GO_LIVE_BLOCKERS.md` — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
 
+## Pour maintenir la documentation
+
+9. `DOCUMENTATION_MAINTENANCE.md` — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
+
 ## Pour vérifier la preuve technique
 
 Consulter les documents du dossier `docs/` relatifs à `AGRICI-001-E2E.md`, `E2E-STATUS.md`, `CI-RUNTIME-PROOF.md`, `ACTUAL-HTTP-CONTRACT.md`, `MIGRATION-CHAIN.md`, `CONCURRENCY-PROOF.md`, `IDEMPOTENCY-SEMANTICS.md` et les autres audits/preuves techniques présents dans le dossier.
