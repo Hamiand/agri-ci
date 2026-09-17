@@ -1,9 +1,11 @@
-"""Prevent one quality check from being assigned to multiple lots.
+"""Document the existing lot-source uniqueness invariant.
 
-The API already treats a quality check as a single-use source.  Enforcing that
-rule in PostgreSQL closes the concurrent-request race as well.
+The database constraint uq_lot_source_quality_check was introduced by migration
+0009_integrity_matching.  The API hardening added later locks quality checks
+with FOR UPDATE and rejects duplicate IDs in a request.  No schema mutation is
+needed here; keeping this revision as a no-op preserves the Alembic chain and
+avoids trying to recreate the existing PostgreSQL constraint.
 """
-from alembic import op
 
 revision="0015_lot_source_uniqueness"
 down_revision="0014_incremental_payment_intents"
@@ -12,16 +14,8 @@ depends_on=None
 
 
 def upgrade():
-    op.create_unique_constraint(
-        "uq_lot_source_quality_check",
-        "lot_sources",
-        ["quality_check_id"],
-    )
+    pass
 
 
 def downgrade():
-    op.drop_constraint(
-        "uq_lot_source_quality_check",
-        "lot_sources",
-        type_="unique",
-    )
+    pass
