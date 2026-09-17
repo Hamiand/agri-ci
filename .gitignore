@@ -1,0 +1,30 @@
+# Secrets / local environment
+.env
+.env.*
+!.env.example
+!*.env.example
+!backend/.env.production.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+
+# Runtime evidence and local data
+backend/.rc1-evidence/
+backups/
+*.dump
+*.log
+
+# OS/editor
+.DS_Store
+.idea/
+.vscode/
