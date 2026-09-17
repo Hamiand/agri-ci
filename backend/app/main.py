@@ -1,8 +1,10 @@
-from fastapi import Depends, FastAPI, Request, HTTPException
+from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.auth.router import router as auth_router
 from app.farmers.router import router as farmers_router
@@ -23,7 +25,7 @@ from app.deliveries.router import router as deliveries_router
 from app.payments.router import router as payments_router
 from app.payments.webhook import router as payment_webhook_router
 from app.core.config import get_settings
-from app.core.exceptions import http_exception_handler
+from app.core.exceptions import http_exception_handler, validation_exception_handler
 from app.core.middleware import RequestIdMiddleware
 from app.core.production_middleware import ProductionHeadersMiddleware
 from app.core.production_readiness import production_checks
@@ -35,7 +37,8 @@ app = FastAPI(
     version="0.9.1",
     description="AGRI-CI: future harvest and agricultural market orchestration foundation.",
 )
-app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_middleware(RequestIdMiddleware)
 app.add_middleware(ProductionHeadersMiddleware)
 
