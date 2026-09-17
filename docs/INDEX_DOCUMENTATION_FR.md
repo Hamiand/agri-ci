@@ -27,9 +27,13 @@ Ce fichier sert de porte d'entrée durable vers la documentation du Commercial P
 
 10. [EXTERNAL_GO_LIVE_BLOCKERS.md](EXTERNAL_GO_LIVE_BLOCKERS.md) — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
 
+## Si un ancien chat disparaît
+
+11. [DOCUMENTATION_RECOVERY.md](DOCUMENTATION_RECOVERY.md) — ordre de récupération de l'état du projet depuis le dépôt.
+
 ## Pour maintenir la documentation
 
-11. [DOCUMENTATION_MAINTENANCE.md](DOCUMENTATION_MAINTENANCE.md) — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
+12. [DOCUMENTATION_MAINTENANCE.md](DOCUMENTATION_MAINTENANCE.md) — règles empêchant la documentation de dériver du logiciel ou de déclarer prématurément des éléments externes terminés.
 
 ## Pour vérifier la preuve technique
 
