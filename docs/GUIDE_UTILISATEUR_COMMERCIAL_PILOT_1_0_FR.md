@@ -5,6 +5,8 @@
 
 Ce guide accompagne les utilisateurs du premier pilote commercial AGRI-CI. Il explique le parcours métier par rôle, depuis la récolte future jusqu'au règlement. Il complète le runbook opérationnel et ne remplace pas les contrôles de production, les procédures du prestataire de paiement ni les validations juridiques applicables.
 
+> **Important — captures d'écran :** le présent guide décrit fidèlement le parcours fonctionnel Release 1.0, mais il ne contient pas encore de captures d'écran certifiées de l'interface déployée. Elles devront être ajoutées à partir de l'environnement pilote effectivement déployé afin d'éviter de documenter une interface différente de celle utilisée sur le terrain.
+
 ---
 
 ## 1. À quoi sert AGRI-CI ?
