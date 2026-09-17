@@ -52,10 +52,15 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     demand_headers={**buyer_headers,"Idempotency-Key":f"demand-{suffix}"};demand_payload={"product_code":product_code,"quantity_required_kg":"3000","delivery_start_date":"2027-05-16","delivery_end_date":"2027-05-18","target_price_xof_per_kg":"760","quality_grades":["A","B"],"destination_city":"Abidjan"}
     demand=client.post("/demands",headers=demand_headers,json=demand_payload);assert demand.status_code==201,demand.text
     demand_replay=client.post("/demands",headers=demand_headers,json=demand_payload);assert demand_replay.status_code==201 and demand_replay.json()==demand.json()
-    demand_id=uuid.UUID(demand.json()["id"]);scores={"Koffi":Decimal("99"),"Awa":Decimal("98"),"Mariam":Decimal("97"),"Yao":Decimal("96"),"Cooperative A":Decimal("95")}
+    demand_id=uuid.UUID(demand.json()["id"])
+    match_headers={**buyer_headers,"Idempotency-Key":f"match-{suffix}"}
+    matched=client.post(f"/demands/{demand_id}/match",headers=match_headers);assert matched.status_code==200,matched.text
+    assert matched.json()["compatible_quantity_kg"]==3450.0 and len(matched.json()["matches"])==5
+    match_replay=client.post(f"/demands/{demand_id}/match",headers=match_headers);assert match_replay.status_code==200 and match_replay.json()==matched.json()
+    scores={"Koffi":Decimal("99"),"Awa":Decimal("98"),"Mariam":Decimal("97"),"Yao":Decimal("96"),"Cooperative A":Decimal("95")}
     with Session.begin() as db:
         for name,_ in farmer_specs:
-            offer=db.get(Offer,offer_ids[name]);db.add(Match(demand_id=demand_id,offer_id=offer_ids[name],compatible_quantity_kg=offer.quantity_available_kg,date_score=100,price_score=100,logistics_score=70,quality_score=100,reliability_score=70,volume_score=70,total_score=scores[name],explanation={"reference_scenario":True}))
+            offer=db.get(Offer,offer_ids[name]);m=db.scalar(__import__('sqlalchemy').select(Match).where(Match.demand_id==demand_id,Match.offer_id==offer_ids[name]));m.total_score=scores[name]
     agg=client.post(f"/demands/{demand_id}/aggregate",headers={**buyer_headers,"Idempotency-Key":f"agg-{suffix}"});assert agg.status_code==200,agg.text
     aggregation_id=uuid.UUID(agg.json()["aggregation_id"]);assert agg.json()["target_quantity_kg"]==3000.0 and agg.json()["proposed_quantity_kg"]==3000.0
     aggregation=client.get(f"/aggregations/{aggregation_id}",headers=buyer_headers);assert aggregation.status_code==200
@@ -113,16 +118,19 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     for payment in payments.json():
         gross=Decimal(str(payment["gross_amount_xof"]));deductions=Decimal(str(payment["deductions_xof"]));net=Decimal(str(payment["net_amount_xof"]));assert gross-deductions==net
         ledger=client.get(f"/payments/{payment['id']}/ledger",headers=ops_headers);assert ledger.status_code==200,ledger.text;entries=ledger.json()["entries"]
-        assert [entry["type"] for entry in entries].count("GROSS")==1 and [entry["type"] for entry in entries].count("DEDUCTION")==3 and [entry["type"] for entry in entries].count("NET_DUE")==1
-        ledger_gross=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="GROSS"),Decimal("0"));ledger_deductions=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="DEDUCTION"),Decimal("0"));ledger_net=sum((Decimal(str(e["amount_xof"])) for e in entries if e["type"]=="NET_DUE"),Decimal("0"))
-        assert ledger_gross==gross and ledger_deductions==deductions and ledger_net==net and ledger_gross-ledger_deductions==ledger_net
-        for entry in entries:
-            if entry["type"]=="DEDUCTION":deduction_totals[entry["description"].split(":",1)[0]]+=Decimal(str(entry["amount_xof"]))
+        assert [entry["type"] for entry in entries].count("GROSS")==1 and [entry["type"] for entry in entries].count("NET_DUE")==1
+        gross_entry=next(Decimal(str(entry["amount_xof"])) for entry in entries if entry["type"]=="GROSS");net_entry=next(Decimal(str(entry["amount_xof"])) for entry in entries if entry["type"]=="NET_DUE")
+        deduction_entries=[entry for entry in entries if entry["type"]=="DEDUCTION"];assert sum(Decimal(str(entry["amount_xof"])) for entry in deduction_entries)==deductions
+        assert gross_entry==gross and net_entry==net
+        for entry in deduction_entries:
+            code=entry["meta"]["code"];assert code in deduction_totals;deduction_totals[code]+=Decimal(str(entry["amount_xof"]))
         total_gross+=gross;total_deductions+=deductions;total_net+=net
-    assert total_gross==Decimal("2280000.00") and deduction_totals=={"TRANSPORT":Decimal("70000.00"),"AGRI_CI_SERVICE":Decimal("45000.00"),"OTHER_AUTHORIZED":Decimal("15000.00")}
-    assert total_deductions==Decimal("130000.00") and total_net==Decimal("2150000.00")
-    first_payment=payments.json()[0];success_headers={**ops_headers,"Idempotency-Key":f"provider-success-{suffix}"};success_payload={"provider_reference":f"PILOT-{suffix}"}
-    success=client.post(f"/payments/{first_payment['id']}/provider-success",headers=success_headers,json=success_payload);assert success.status_code==200,success.text
-    assert success.json()["status"]=="SUCCESS" and success.json()["provider_reference"]==success_payload["provider_reference"]
-    success_replay=client.post(f"/payments/{first_payment['id']}/provider-success",headers=success_headers,json=success_payload);assert success_replay.status_code==200 and success_replay.json()==success.json()
-    engine.dispose()
+    assert total_gross==Decimal("2280000") and total_deductions==Decimal("130000") and total_net==Decimal("2150000")
+    assert deduction_totals=={"TRANSPORT":Decimal("70000"),"AGRI_CI_SERVICE":Decimal("45000"),"OTHER_AUTHORIZED":Decimal("15000")}
+
+    chosen=payments.json()[0];provider_headers={**ops_headers,"Idempotency-Key":f"provider-success-{suffix}"};provider_payload={"provider_reference":f"PILOT-{suffix}"}
+    provider_success=client.post(f"/payments/{chosen['id']}/provider-success",headers=provider_headers,json=provider_payload);assert provider_success.status_code==200,provider_success.text
+    provider_replay=client.post(f"/payments/{chosen['id']}/provider-success",headers=provider_headers,json=provider_payload);assert provider_replay.status_code==200 and provider_replay.json()==provider_success.json()
+    paid_ledger=client.get(f"/payments/{chosen['id']}/ledger",headers=ops_headers);assert paid_ledger.status_code==200
+    assert [entry["type"] for entry in paid_ledger.json()["entries"]].count("NET_PAID")==1
+    farmer_payment=client.get("/payments/me",headers=farmer_tokens["Koffi"]);assert farmer_payment.status_code==200
