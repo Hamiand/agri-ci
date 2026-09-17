@@ -33,6 +33,10 @@ The autonomous repository/documentation work for recovering and preserving Relea
 
 These decisions are intentionally not invented by the software repository.
 
+### User-guide screenshot boundary
+
+The functional French guide is complete for the documented Release 1.0 workflow. Certified screenshots remain intentionally pending until an actual pilot deployment exists, so the guide does not present mockups as deployed UI evidence.
+
 ### Scope discipline
 
 Optional post-pilot functions remain outside Release 1.0 and should not delay the controlled commercial pilot.
