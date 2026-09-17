@@ -78,6 +78,23 @@ def my_allocations(db:Session=Depends(get_db),user:User=Depends(get_current_user
           "remaining_quantity_kg":float(a.quantity_kg)-collected,"status":a.status})
     return out
 
+@router.get("/pending")
+def pending_collection_allocations(db:Session=Depends(get_db),user:User=Depends(require_roles("COLLECTION_AGENT","OPERATIONS_MANAGER","ADMIN"))):
+    from app.database.models import Order,Product
+    rows=db.execute(select(OrderAllocation,Order,Product,Farmer)
+        .join(Order,OrderAllocation.order_id==Order.id).join(Product,Order.product_id==Product.id)
+        .join(Farmer,OrderAllocation.farmer_id==Farmer.id).order_by(Order.created_at.desc())).all()
+    out=[]
+    for a,o,p,f in rows:
+        collected=db.scalar(select(func.coalesce(func.sum(CollectionEvent.received_quantity_kg),0))
+          .where(CollectionEvent.order_allocation_id==a.id))
+        remaining=Decimal(a.quantity_kg)-Decimal(collected)
+        if remaining<=0:continue
+        out.append({"allocation_id":str(a.id),"order_id":str(o.id),"order_ref":o.order_ref,
+          "product_name":p.name_fr,"farmer_name":f.display_name,"allocated_quantity_kg":float(a.quantity_kg),
+          "collected_quantity_kg":float(collected),"remaining_quantity_kg":float(remaining)})
+    return out
+
 @router.get("/operations")
 def collection_operations(db:Session=Depends(get_db),user:User=Depends(require_roles("COLLECTION_AGENT","OPERATIONS_MANAGER","ADMIN"))):
     from app.database.models import Order,Product
