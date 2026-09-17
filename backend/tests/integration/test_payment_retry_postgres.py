@@ -17,22 +17,34 @@ pytestmark = [
 def test_failed_and_refunded_payments_release_quantity_for_retry():
     """Commercial invariant: failed/refunded attempts must not consume delivered kg.
 
-    PENDING/PROCESSING/SUCCESS/DISPUTED still reserve their represented quantity,
-    while FAILED/REFUNDED become eligible for a new settlement attempt.
+    The authenticated AGRI-CI-001 HTTP flow runs earlier in this integration suite
+    and creates real orders, farmers and payment intents. Reuse one valid
+    order/farmer ownership pair so this proof exercises PostgreSQL with all foreign
+    keys enabled rather than weakening database integrity for the test.
     """
     engine = create_engine(os.environ["TEST_DATABASE_URL"], pool_pre_ping=True)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
-    order_id = uuid.uuid4()
-    farmer_id = uuid.uuid4()
 
-    # This test exercises the real PostgreSQL query used by settlement preparation.
-    # Foreign keys make isolated inserts intentionally cumbersome, so use the
-    # already-migrated table inside one rolled-back transaction with constraints
-    # deferred only for this test fixture.
     with engine.connect() as connection:
         transaction = connection.begin()
         try:
-            connection.execute(text("SET CONSTRAINTS ALL DEFERRED"))
+            seed = connection.execute(
+                text("SELECT order_id, farmer_id FROM payment_intents ORDER BY created_at LIMIT 1")
+            ).first()
+            assert seed is not None, "AGRI-CI-001 payment fixture must exist"
+            order_id, farmer_id = seed
+
+            # Isolate this proof from the payments created by the full E2E flow.
+            connection.execute(
+                text("DELETE FROM ledger_entries WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE order_id=:order_id)"),
+                {"order_id": order_id},
+            )
+            connection.execute(
+                text("DELETE FROM payment_deductions WHERE payment_intent_id IN (SELECT id FROM payment_intents WHERE order_id=:order_id)"),
+                {"order_id": order_id},
+            )
+            connection.execute(text("DELETE FROM payment_intents WHERE order_id=:order_id"), {"order_id": order_id})
+
             statuses = [
                 ("PENDING", Decimal("10.000")),
                 ("PROCESSING", Decimal("20.000")),
