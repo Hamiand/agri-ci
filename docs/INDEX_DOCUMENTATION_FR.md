@@ -16,6 +16,10 @@ Ce fichier sert de porte d'entrée durable vers la documentation du Commercial P
 4. `CONTROLLED_FIELD_PILOT_RUNBOOK.md` — procédure contrôlée de bout en bout.
 5. `FIRST_PILOT_ORDER_CONTROL_SHEET.md` — fiche de contrôle de la première commande.
 
+## Pour suivre ce qui bloque encore le go-live réel
+
+6. `EXTERNAL_GO_LIVE_BLOCKERS.md` — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
+
 ## Pour vérifier la preuve technique
 
 Consulter les documents du dossier `docs/` relatifs à :
@@ -29,6 +33,6 @@ Consulter les documents du dossier `docs/` relatifs à :
 - `IDEMPOTENCY-SEMANTICS.md` ;
 - les autres audits et preuves techniques présents dans ce dossier.
 
-## Blocages externes
+## Règle de statut
 
-Ne jamais confondre réussite logicielle et autorisation de mise en service réelle. Les éléments externes — infrastructure de production, prestataire de paiement agréé/certifié, validation juridique/confidentialité et onboarding réel des partenaires — doivent rester suivis séparément jusqu'à vérification.
+Ne jamais confondre réussite logicielle et autorisation de mise en service réelle. Les éléments externes doivent rester suivis séparément jusqu'à vérification.
