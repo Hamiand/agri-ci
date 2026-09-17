@@ -29,14 +29,14 @@ def collect(p:CollectionCreate,db:Session=Depends(get_db),user:User=Depends(requ
         raise HTTPException(status_code=409,detail="COLLECTION_EXCEEDS_ALLOCATION")
     c=CollectionEvent(collection_ref=f"COL-{uuid.uuid4().hex[:10].upper()}",order_id=allocation.order_id,
         order_allocation_id=allocation.id,farmer_id=allocation.farmer_id,
-        announced_quantity_kg=allocation.quantity_kg,received_quantity_kg=p.received_quantity_kg,
-        location_name=p.location_name,status="RECEIVED")
+        received_quantity_kg=p.received_quantity_kg,
+        location_name=p.location_name or "AGRI-CI collection point")
     db.add(c);db.flush()
     db.add(DomainEvent(event_type="COLLECTION_RECORDED",aggregate_type="ORDER",aggregate_id=str(allocation.order_id),
         payload={"collection_ref":c.collection_ref,"received_kg":float(c.received_quantity_kg)}))
     db.flush()
     body={"collection_id":str(c.id),"collection_ref":c.collection_ref,
-          "announced_quantity_kg":float(c.announced_quantity_kg),"received_quantity_kg":float(c.received_quantity_kg)}
+          "announced_quantity_kg":float(allocation.quantity_kg),"received_quantity_kg":float(c.received_quantity_kg)}
     return complete_idempotent(db,idem,201,body)
 
 class QualityCreate(BaseModel):
