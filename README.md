@@ -10,6 +10,7 @@ Documents principaux :
 
 - [Guide utilisateur — Commercial Pilot 1.0 (FR)](docs/GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)
 - [Historique maître AGRI-CI](docs/HISTORIQUE_MAITRE_AGRI_CI.md)
+- [Journal / changelog du pilote 1.0](docs/CHANGELOG_PILOT_1_0.md)
 - [Commercial Pilot Release 1.0 Gate](docs/COMMERCIAL_PILOT_RELEASE_1_0.md)
 - [Controlled Field Pilot Runbook](docs/CONTROLLED_FIELD_PILOT_RUNBOOK.md)
 - [First Pilot Order Control Sheet](docs/FIRST_PILOT_ORDER_CONTROL_SHEET.md)
