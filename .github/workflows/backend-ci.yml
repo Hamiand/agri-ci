@@ -25,7 +25,7 @@ jobs:
       TEST_DATABASE_URL: postgresql+psycopg://agrici:agrici_test@localhost:5432/agrici_test
       REDIS_URL: redis://localhost:6379/0
       PAYMENT_WEBHOOK_SECRET: ci-payment-webhook-secret-change-this
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: https://pilot.agri-ci.example
       APP_ENV: staging
       JWT_SECRET: ci-test-secret-for-runtime-validation-only
     defaults:
@@ -82,7 +82,7 @@ jobs:
       APP_ENV: staging
       JWT_SECRET: ci-runtime-proof-secret-not-for-production
       PAYMENT_WEBHOOK_SECRET: ci-runtime-payment-secret-not-for-production
-      CORS_ORIGINS: http://localhost:3000
+      CORS_ORIGINS: https://pilot.agri-ci.example
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
