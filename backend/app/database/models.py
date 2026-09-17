@@ -229,7 +229,7 @@ class OrderAllocation(Base):
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
     offer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("offers.id"),nullable=False)
     quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
-    unit_price_xof_per_kg: Mapped[Decimal]=mapped_column(Numeric(14,2),nullable=False)
+    unit_price_xof_per_kg: Mapped[Decimal|None]=mapped_column(Numeric(14,2),nullable=True)
     status: Mapped[str]=mapped_column(String(30),default="ALLOCATED",nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
@@ -241,7 +241,7 @@ class CollectionEvent(Base):
     order_allocation_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("order_allocations.id"),nullable=False)
     farmer_id: Mapped[uuid.UUID]=mapped_column(UUID(as_uuid=True),ForeignKey("farmers.id"),nullable=False)
     received_quantity_kg: Mapped[Decimal]=mapped_column(Numeric(14,3),nullable=False)
-    location_name: Mapped[str]=mapped_column(String(180),nullable=False)
+    location_name: Mapped[str|None]=mapped_column(String(180),nullable=True)
     collected_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
 
 class QualityCheck(Base):
@@ -314,6 +314,7 @@ class PaymentIntent(Base):
     currency: Mapped[str]=mapped_column(String(3),default="XOF",nullable=False)
     provider: Mapped[str]=mapped_column(String(50),nullable=False)
     provider_reference: Mapped[str|None]=mapped_column(String(120),unique=True)
+    settled_quantity_kg: Mapped[Decimal|None]=mapped_column(Numeric(14,3),nullable=True)
     status: Mapped[str]=mapped_column(String(30),default="PENDING",nullable=False)
     created_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
     updated_at: Mapped[datetime]=mapped_column(DateTime(timezone=True),default=utcnow,nullable=False)
