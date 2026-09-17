@@ -8,6 +8,8 @@ Plateforme pilote de coordination de transactions agricoles traçables en Côte 
 
 **État actuel :** [Project Status](docs/PROJECT_STATUS.md)
 
+**Prochaine étape :** [Passage du Release 1.0 au pilote réel](docs/NEXT_STEP_AFTER_RELEASE_1_0.md)
+
 Documents principaux :
 
 - [Guide utilisateur — Commercial Pilot 1.0 (FR)](docs/GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)
