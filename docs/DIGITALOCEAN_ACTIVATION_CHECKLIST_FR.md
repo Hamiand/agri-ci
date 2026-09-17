@@ -1,5 +1,7 @@
 # AGRI-CI — Checklist d’activation DigitalOcean
 
+[English version](DIGITALOCEAN_ACTIVATION_CHECKLIST_EN.md)
+
 Cette checklist commence uniquement lorsque le propriétaire du projet décide d’autoriser la création de ressources DigitalOcean. Elle ne contient aucun secret.
 
 ## Avant de cliquer sur « Create Resources »
