@@ -12,6 +12,7 @@ Plateforme pilote de coordination de transactions agricoles traçables en Côte 
 
 Documents principaux :
 
+- [Démarrage rapide utilisateur (FR)](docs/USER_GUIDE_QUICK_START_FR.md)
 - [Guide utilisateur — Commercial Pilot 1.0 (FR)](docs/GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)
 - [Historique maître AGRI-CI](docs/HISTORIQUE_MAITRE_AGRI_CI.md)
 - [Journal / changelog du pilote 1.0](docs/CHANGELOG_PILOT_1_0.md)
