@@ -1,5 +1,7 @@
 # AGRI-CI — Project Status
 
+**Last documentation consolidation: 2026-09-17**
+
 ## Commercial Pilot Release 1.0
 
 ### Software
@@ -17,16 +19,7 @@ Reference documents:
 
 ### User and field documentation
 
-**Available in repository:**
-
-- French user guide;
-- master project history;
-- readable pilot changelog;
-- controlled field pilot runbook;
-- first-order control sheet;
-- French documentation index;
-- external blocker tracker;
-- post-release activation sequence.
+**Available in repository:** French user guide, master project history, readable pilot changelog, controlled field pilot runbook, first-order control sheet, French documentation index, external blocker tracker and post-release activation sequence.
 
 ### External go-live readiness
 
