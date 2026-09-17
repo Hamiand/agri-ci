@@ -1,7 +1,9 @@
 """Allow multiple payment intents per farmer/order for incremental settlement.
 
-Idempotency and the order row lock protect duplicate settlement preparation;
-settled_quantity_kg records the quantity represented by each tranche.
+The non-unique order/farmer lookup index already exists from migration 0007.
+Migration 0010 later added a unique constraint on the same columns. Removing
+that constraint is therefore sufficient to permit incremental settlement while
+retaining the original lookup index.
 """
 from alembic import op
 
@@ -13,12 +15,10 @@ depends_on=None
 
 def upgrade():
     op.drop_constraint("uq_payment_order_farmer","payment_intents",type_="unique")
-    op.create_index("ix_payment_order_farmer","payment_intents",["order_id","farmer_id"],unique=False)
 
 
 def downgrade():
-    op.drop_index("ix_payment_order_farmer",table_name="payment_intents")
-    # Downgrade is intentionally conservative: a database that has already
-    # stored multiple settlement tranches must consolidate them before the old
-    # one-payment-per-farmer uniqueness rule can safely be restored.
+    # A database that has already stored multiple settlement tranches must
+    # consolidate them before this downgrade can restore the old uniqueness
+    # rule. PostgreSQL will reject the downgrade rather than silently lose data.
     op.create_unique_constraint("uq_payment_order_farmer","payment_intents",["order_id","farmer_id"])
