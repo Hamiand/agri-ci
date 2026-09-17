@@ -28,6 +28,18 @@ jobs:
         run: docker build -t agrici-backend:ci ./backend
       - name: Build web production image
         run: docker build --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.pilot.agri-ci.example -t agrici-web:ci ./web
+      - name: Verify deployment commands in backend image
+        run: |
+          docker run --rm \
+            -e DATABASE_URL=postgresql+psycopg://x:x@localhost/x \
+            -e REDIS_URL=redis://localhost:6379/0 \
+            -e JWT_SECRET=ci-container-secret-long-enough-for-import \
+            agrici-backend:ci alembic --version
+          docker run --rm \
+            -e DATABASE_URL=postgresql+psycopg://x:x@localhost/x \
+            -e REDIS_URL=redis://localhost:6379/0 \
+            -e JWT_SECRET=ci-container-secret-long-enough-for-import \
+            agrici-backend:ci python -c "import app.events.worker; print('worker import ok')"
       - name: Smoke-test backend health endpoint
         run: |
           docker run -d --rm --name agrici-backend-ci -p 18000:8000 \
