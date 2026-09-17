@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import sessionmaker
 
 from app.core.idempotency_service import begin_idempotent
-from app.database.models import CollectionEvent, OrderAllocation, User
+from app.database.models import CollectionEvent, OrderAllocation, Role, User, UserRole
 
 pytestmark = [
     pytest.mark.integration,
@@ -23,14 +23,20 @@ def test_failed_collection_mutation_rolls_back_business_and_idempotency_rows():
 
     with Session() as db:
         allocation=db.scalar(select(OrderAllocation).order_by(OrderAllocation.created_at.desc()))
-        user=db.scalar(select(User).where(User.role.in_(["COLLECTION_AGENT","OPERATIONS_MANAGER","ADMIN"])).limit(1))
+        user=db.scalar(
+            select(User)
+            .join(UserRole,UserRole.user_id==User.id)
+            .join(Role,Role.id==UserRole.role_id)
+            .where(Role.name.in_(["COLLECTION_AGENT","OPERATIONS_MANAGER","ADMIN"]))
+            .limit(1)
+        )
         assert allocation is not None and user is not None,"AGRI-CI-001 fixtures required"
         before=db.scalar(select(func.count(CollectionEvent.id)).where(CollectionEvent.order_allocation_id==allocation.id))
         key=f"rollback-proof-{uuid.uuid4()}"
         payload={"order_allocation_id":str(allocation.id),"received_quantity_kg":"999999.000","location_name":"rollback-proof"}
 
         try:
-            idem=begin_idempotent(db,user,"/collection",key,payload)
+            begin_idempotent(db,user,"/collection",key,payload)
             locked=db.scalar(select(OrderAllocation).where(OrderAllocation.id==allocation.id).with_for_update())
             assert locked is not None
             already=db.scalar(select(func.coalesce(func.sum(CollectionEvent.received_quantity_kg),0)).where(CollectionEvent.order_allocation_id==allocation.id))
