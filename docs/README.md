@@ -8,7 +8,11 @@ Pour la documentation du **Commercial Pilot Release 1.0**, commencer par :
 
 ➡️ **[PROJECT_STATUS.md](PROJECT_STATUS.md)**
 
-Guide utilisateur français :
+Démarrage rapide :
+
+➡️ **[USER_GUIDE_QUICK_START_FR.md](USER_GUIDE_QUICK_START_FR.md)**
+
+Guide utilisateur français complet :
 
 ➡️ **[GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md](GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md)**
 
