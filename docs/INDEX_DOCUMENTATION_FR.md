@@ -2,24 +2,28 @@
 
 Ce fichier sert de porte d'entrée durable vers la documentation du Commercial Pilot Release 1.0.
 
+## État actuel
+
+1. `PROJECT_STATUS.md` — statut synthétique durable du projet.
+
 ## Pour comprendre le projet
 
-1. `HISTORIQUE_MAITRE_AGRI_CI.md` — évolution du projet, décisions de périmètre et état actuel.
-2. `CHANGELOG_PILOT_1_0.md` — résumé lisible des grandes phases de développement.
-3. `COMMERCIAL_PILOT_RELEASE_1_0.md` — définition officielle de la barrière Release 1.0.
+2. `HISTORIQUE_MAITRE_AGRI_CI.md` — évolution du projet, décisions de périmètre et état actuel.
+3. `CHANGELOG_PILOT_1_0.md` — résumé lisible des grandes phases de développement.
+4. `COMMERCIAL_PILOT_RELEASE_1_0.md` — définition officielle de la barrière Release 1.0.
 
 ## Pour utiliser AGRI-CI
 
-4. `GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md` — guide français par rôle : producteur, acheteur, collecte/opérations, transport et règlement.
+5. `GUIDE_UTILISATEUR_COMMERCIAL_PILOT_1_0_FR.md` — guide français par rôle : producteur, acheteur, collecte/opérations, transport et règlement.
 
 ## Pour conduire le pilote terrain
 
-5. `CONTROLLED_FIELD_PILOT_RUNBOOK.md` — procédure contrôlée de bout en bout.
-6. `FIRST_PILOT_ORDER_CONTROL_SHEET.md` — fiche de contrôle de la première commande.
+6. `CONTROLLED_FIELD_PILOT_RUNBOOK.md` — procédure contrôlée de bout en bout.
+7. `FIRST_PILOT_ORDER_CONTROL_SHEET.md` — fiche de contrôle de la première commande.
 
 ## Pour suivre ce qui bloque encore le go-live réel
 
-7. `EXTERNAL_GO_LIVE_BLOCKERS.md` — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
+8. `EXTERNAL_GO_LIVE_BLOCKERS.md` — checklist séparée pour infrastructure de production, prestataire de paiement agréé, partenaires réels et validations juridique/confidentialité.
 
 ## Pour vérifier la preuve technique
 
