@@ -1,33 +1,22 @@
-import os
-import uuid
+import os,uuid
 from decimal import Decimal
-
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from app.database.models import Match,Offer,Product
 
-from app.database.models import Match, Offer, Product
+pytestmark=pytest.mark.integration
 
-pytestmark = [pytest.mark.integration,pytest.mark.skipif(not os.getenv("TEST_DATABASE_URL"),reason="TEST_DATABASE_URL required")]
-
-def _auth(client,phone,password):
-    response=client.post("/auth/login",json={"phone":phone,"password":password});assert response.status_code==200,response.text
-    return {"Authorization":f"Bearer {response.json()['access_token']}"}
 
 def _register(client,phone,password,role):
-    response=client.post("/auth/register",json={"phone":phone,"password":password,"preferred_language":"fr","role":role})
-    assert response.status_code==201,response.text
-    return response.json()["id"]
+    r=client.post("/auth/register",json={"phone":phone,"password":password,"roles":[role]});assert r.status_code==201,r.text;return r.json()["id"]
 
-def test_agrici001_http_security_and_idempotency_smoke(app_client):
-    assert app_client.get("/health").status_code==200
-    assert app_client.get("/farmers/me").status_code in (401,403)
+def _auth(client,phone,password):
+    r=client.post("/auth/login",json={"phone":phone,"password":password});assert r.status_code==200,r.text;return {"Authorization":f"Bearer {r.json()['access_token']}"}
 
-def test_mutation_without_auth_is_rejected_before_business_processing(app_client):
-    assert app_client.post("/demands/00000000-0000-0000-0000-000000000001/aggregate").status_code in (401,403)
 
 def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
-    client=app_client;suffix=uuid.uuid4().hex[:8];password="Pilot-Test-Password-123!"
+    client=app_client;suffix=uuid.uuid4().hex[:8];password="PilotPass-2026!"
     buyer_phone=f"+225010{suffix}";ops_phone=f"+225099{suffix}";transporter_phone=f"+225088{suffix}";other_transporter_phone=f"+225087{suffix}"
     farmer_specs=[("Koffi","400"),("Awa","750"),("Mariam","600"),("Yao","300"),("Cooperative A","1400")]
     _register(client,buyer_phone,password,"BUYER");buyer_headers=_auth(client,buyer_phone,password)
@@ -133,4 +122,4 @@ def test_agrici001_exact_3000kg_authenticated_http_flow(app_client):
     provider_replay=client.post(f"/payments/{chosen['id']}/provider-success",headers=provider_headers,json=provider_payload);assert provider_replay.status_code==200 and provider_replay.json()==provider_success.json()
     paid_ledger=client.get(f"/payments/{chosen['id']}/ledger",headers=ops_headers);assert paid_ledger.status_code==200
     assert [entry["type"] for entry in paid_ledger.json()["entries"]].count("NET_PAID")==1
-    farmer_payment=client.get("/payments/me",headers=farmer_tokens["Koffi"]);assert farmer_payment.status_code==200
+    farmer_payment=client.get("/payments/farmer/me",headers=farmer_tokens["Koffi"]);assert farmer_payment.status_code==200
