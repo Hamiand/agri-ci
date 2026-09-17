@@ -31,6 +31,13 @@ def test_signed_webhook_failed_then_retry_eligible():
     assert row is not None,"AGRI-CI-001 must leave a pending settlement payment"
     payment_id,order_id,farmer_id,quantity=row
 
+    # AGRI-CI-001 has two settlement tranches per farmer. Measure the exact
+    # reservation delta so another still-pending tranche is not mistaken for a
+    # failure to release this payment's kilograms.
+    with SessionLocal() as db:
+        reserved_before=_already_settled_quantity_by_farmer(db,order_id)
+    assert reserved_before.get(farmer_id,0) >= quantity
+
     client=TestClient(app)
     payload={"event":"payment.failed","payment_id":str(payment_id),"provider_reference":"FAIL-HTTP-001"}
 
@@ -46,10 +53,9 @@ def test_signed_webhook_failed_then_retry_eligible():
         state=connection.execute(text("SELECT status,provider_reference FROM payment_intents WHERE id=:id"),{"id":payment_id}).first()
     assert state==("FAILED","FAIL-HTTP-001")
 
-    # The failed attempt must no longer reserve its represented kilograms.
     with SessionLocal() as db:
-        reserved=_already_settled_quantity_by_farmer(db,order_id)
-    assert reserved.get(farmer_id,0) < quantity or farmer_id not in reserved
+        reserved_after=_already_settled_quantity_by_farmer(db,order_id)
+    assert reserved_after.get(farmer_id,0)==reserved_before.get(farmer_id,0)-quantity
 
 
 def test_signed_webhook_refund_requires_success():
