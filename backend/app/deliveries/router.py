@@ -15,11 +15,13 @@ router=APIRouter(prefix="/deliveries",tags=["Deliveries"])
 class DeliveryCreate(BaseModel):
     transport_job_id:uuid.UUID
     delivered_quantity_kg:Decimal=Field(gt=0)
-    received_by:str
+    received_by:str=Field(min_length=1,max_length=200)
 
 @router.post("",status_code=201)
 def deliver(p:DeliveryCreate,db:Session=Depends(get_db),user:User=Depends(require_roles("OPERATIONS_MANAGER","ADMIN")),
             idempotency_key:str|None=Header(default=None,alias="Idempotency-Key")):
+    receiver=p.received_by.strip()
+    if not receiver:raise HTTPException(status_code=422,detail="DELIVERY_RECEIVER_REQUIRED")
     idem=begin_idempotent(db,user,"/deliveries",idempotency_key,p.model_dump(mode="json"))
     if idem.response_body is not None:return idem.response_body
     job=db.scalar(select(TransportJob).where(TransportJob.id==p.transport_job_id).with_for_update())
@@ -32,7 +34,7 @@ def deliver(p:DeliveryCreate,db:Session=Depends(get_db),user:User=Depends(requir
         raise HTTPException(status_code=409,detail="DELIVERY_EXCEEDS_TRANSPORTED_QUANTITY")
     d=Delivery(delivery_ref=f"DEL-{uuid.uuid4().hex[:10].upper()}",order_id=job.order_id,
         transport_job_id=job.id,delivered_quantity_kg=p.delivered_quantity_kg,
-        received_by=p.received_by,status="DELIVERED")
+        received_by=receiver,status="DELIVERED")
     db.add(d)
     if Decimal(already)+p.delivered_quantity_kg==Decimal(capacity):
         job.status="DELIVERED";job.arrived_at=datetime.now(timezone.utc)
