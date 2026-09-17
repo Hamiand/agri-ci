@@ -1,13 +1,43 @@
-export const API=process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api/v1";
+export const API=(process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000").replace(/\/$/,"");
 
-export function getToken(){if(typeof window==="undefined") return ""; return localStorage.getItem("agrici_access_token")||"";}
-export function setTokens(access:string,refresh?:string){localStorage.setItem("agrici_access_token",access);if(refresh)localStorage.setItem("agrici_refresh_token",refresh);}
-export async function api(path:string,options:RequestInit={}){
- const token=getToken(); const headers=new Headers(options.headers);
- if(!headers.has("Content-Type")) headers.set("Content-Type","application/json");
+const ACCESS="agrici_access_token";
+const REFRESH="agrici_refresh_token";
+
+export function getToken(){if(typeof window==="undefined") return ""; return sessionStorage.getItem(ACCESS)||"";}
+export function getRefreshToken(){if(typeof window==="undefined") return ""; return sessionStorage.getItem(REFRESH)||"";}
+export function setTokens(access:string,refresh?:string){
+ if(typeof window==="undefined") return;
+ sessionStorage.setItem(ACCESS,access);
+ if(refresh) sessionStorage.setItem(REFRESH,refresh);
+}
+export function clearTokens(){
+ if(typeof window==="undefined") return;
+ sessionStorage.removeItem(ACCESS);sessionStorage.removeItem(REFRESH);
+}
+
+async function parse(r:Response){return r.json().catch(()=>({}));}
+
+async function refreshAccessToken(){
+ const refresh=getRefreshToken();
+ if(!refresh) return false;
+ const r=await fetch(`${API}/auth/refresh`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({refresh_token:refresh})});
+ if(!r.ok){clearTokens();return false;}
+ const data=await parse(r);
+ if(!data.access_token){clearTokens();return false;}
+ setTokens(data.access_token,data.refresh_token||refresh);
+ return true;
+}
+
+export async function api(path:string,options:RequestInit={},retry=true){
+ const token=getToken();const headers=new Headers(options.headers);
+ if(!headers.has("Content-Type") && options.body) headers.set("Content-Type","application/json");
  if(token) headers.set("Authorization",`Bearer ${token}`);
- const r=await fetch(`${API}${path}`,{...options,headers});
- const data=await r.json().catch(()=>({}));
+ let r=await fetch(`${API}${path}`,{...options,headers});
+ if(r.status===401 && retry && getRefreshToken()){
+  const refreshed=await refreshAccessToken();
+  if(refreshed) return api(path,options,false);
+ }
+ const data=await parse(r);
  if(!r.ok) throw new Error(data?.error?.message||data?.detail||"AGRI-CI request failed");
  return data;
 }
