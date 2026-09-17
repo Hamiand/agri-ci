@@ -20,7 +20,10 @@ def add_ledger(db,payment,entry_type,amount,description):
         currency="XOF",description=description))
 
 def mark_provider_success(db:Session,payment:PaymentIntent,provider_reference:str):
-    if payment.status=="SUCCESS": return payment
+    if payment.status=="SUCCESS":
+        if payment.provider_reference != provider_reference:
+            raise HTTPException(status_code=409,detail="PAYMENT_PROVIDER_REFERENCE_CONFLICT")
+        return payment
     if payment.status not in {"PENDING","PROCESSING"}:
         raise HTTPException(status_code=409,detail="INVALID_PAYMENT_STATE")
     payment.status="SUCCESS";payment.provider_reference=provider_reference
