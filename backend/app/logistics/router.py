@@ -34,13 +34,19 @@ def create_lot(p:LotCreate,db:Session=Depends(get_db),user:User=Depends(require_
     if idem.response_body is not None:return idem.response_body
     order=db.get(Order,p.order_id)
     if not order:raise HTTPException(status_code=404,detail="ORDER_NOT_FOUND")
-    checks=[db.get(QualityCheck,x) for x in p.quality_check_ids]
-    if not checks or any(x is None for x in checks):raise HTTPException(status_code=404,detail="QUALITY_CHECK_NOT_FOUND")
+    # Lock source rows in deterministic order.  Without this, two requests with
+    # different idempotency keys can both observe an unused quality check and
+    # attempt to put the same physical produce into two lots.
+    requested_ids=sorted(set(p.quality_check_ids),key=str)
+    if len(requested_ids)!=len(p.quality_check_ids):
+        raise HTTPException(status_code=409,detail="DUPLICATE_QUALITY_CHECK")
+    checks=list(db.scalars(select(QualityCheck).where(QualityCheck.id.in_(requested_ids)).order_by(QualityCheck.id).with_for_update()).all())
+    if not checks or len(checks)!=len(requested_ids):raise HTTPException(status_code=404,detail="QUALITY_CHECK_NOT_FOUND")
     collection_ids={x.collection_event_id for x in checks}
     collections=[db.get(CollectionEvent,x) for x in collection_ids]
     if any(c is None or c.order_id!=order.id for c in collections):
         raise HTTPException(status_code=409,detail="QUALITY_CHECK_NOT_FROM_ORDER")
-    already_used=set(db.scalars(select(LotSource.quality_check_id).where(LotSource.quality_check_id.in_(p.quality_check_ids))).all())
+    already_used=set(db.scalars(select(LotSource.quality_check_id).where(LotSource.quality_check_id.in_(requested_ids))).all())
     if already_used:raise HTTPException(status_code=409,detail="QUALITY_CHECK_ALREADY_LOTTED")
     grades={x.grade for x in checks}
     if len(grades)!=1:raise HTTPException(status_code=409,detail="LOT_MUST_HAVE_SINGLE_GRADE")
